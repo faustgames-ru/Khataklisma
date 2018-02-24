@@ -1,0 +1,14 @@
+#version 100
+
+uniform mediump mat4 projection;
+
+attribute mediump vec2 xy;
+varying mediump vec2 texCoord;
+attribute mediump vec2 uv;
+
+void main()
+{
+    gl_Position = projection * vec4(xy, 0.0, 1.0);
+    texCoord = uv;
+}
+

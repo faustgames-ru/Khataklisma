@@ -8,13 +8,11 @@
 			"type": "blob"
 		},
 		{
-			"name": "all_scene_images",
+			"name": "calibri_fnt",
 			"files": [
-				"all_scene_images.png"
+				"calibri.fnt"
 			],
-			"type": "image",
-			"original_width": 2048,
-			"original_height": 1329
+			"type": "blob"
 		},
 		{
 			"name": "calibri_0",
@@ -26,43 +24,19 @@
 			"original_height": 512
 		},
 		{
-			"name": "calibri_fnt",
+			"name": "all_scene_images",
 			"files": [
-				"calibri.fnt"
+				"all_scene_images.png"
 			],
-			"type": "blob"
-		},
-		{
-			"name": "painter_texture_frag",
-			"files": [
-				"painter-texture.frag.essl",
-				"painter-texture-webgl2.frag.essl"
-			],
-			"type": "shader",
-			"inputs": [
-				{
-					"name": "texCoord",
-					"type": "vec2"
-				}
-			],
-			"outputs": [
-				{
-					"name": "FragColor",
-					"type": "vec4"
-				}
-			],
-			"uniforms": [
-				{
-					"name": "tex",
-					"type": "sampler2D"
-				}
-			],
-			"types": []
+			"type": "image",
+			"original_width": 2048,
+			"original_height": 1329
 		},
 		{
 			"name": "painter_texture_vert",
 			"files": [
 				"painter-texture.vert.essl",
+				"painter-texture-relaxed.vert.essl",
 				"painter-texture-webgl2.vert.essl"
 			],
 			"type": "shader",
@@ -121,9 +95,38 @@
 			]
 		},
 		{
+			"name": "painter_texture_frag",
+			"files": [
+				"painter-texture.frag.essl",
+				"painter-texture-relaxed.frag.essl",
+				"painter-texture-webgl2.frag.essl"
+			],
+			"type": "shader",
+			"inputs": [
+				{
+					"name": "texCoord",
+					"type": "vec2"
+				}
+			],
+			"outputs": [
+				{
+					"name": "FragColor",
+					"type": "vec4"
+				}
+			],
+			"uniforms": [
+				{
+					"name": "tex",
+					"type": "sampler2D"
+				}
+			],
+			"types": []
+		},
+		{
 			"name": "painter_colored_frag",
 			"files": [
 				"painter-colored.frag.essl",
+				"painter-colored-relaxed.frag.essl",
 				"painter-colored-webgl2.frag.essl"
 			],
 			"type": "shader",
@@ -143,70 +146,10 @@
 			"types": []
 		},
 		{
-			"name": "painter_colored_vert",
-			"files": [
-				"painter-colored.vert.essl",
-				"painter-colored-webgl2.vert.essl"
-			],
-			"type": "shader",
-			"inputs": [
-				{
-					"name": "vertexPosition",
-					"type": "vec3"
-				},
-				{
-					"name": "vertexColor",
-					"type": "vec4"
-				},
-				{
-					"name": "gl_VertexID",
-					"type": "int"
-				},
-				{
-					"name": "gl_InstanceID",
-					"type": "int"
-				}
-			],
-			"outputs": [
-				{
-					"name": "fragmentColor",
-					"type": "vec4"
-				}
-			],
-			"uniforms": [
-				{
-					"name": "projectionMatrix",
-					"type": "mat4"
-				}
-			],
-			"types": [
-				{
-					"name": "gl_PerVertex",
-					"members": [
-						{
-							"type": "vec4",
-							"name": "gl_Position"
-						},
-						{
-							"type": "float",
-							"name": "gl_PointSize"
-						},
-						{
-							"type": "float[]",
-							"name": "gl_ClipDistance"
-						},
-						{
-							"type": "float[]",
-							"name": "gl_CullDistance"
-						}
-					]
-				}
-			]
-		},
-		{
 			"name": "painter_image_frag",
 			"files": [
 				"painter-image.frag.essl",
+				"painter-image-relaxed.frag.essl",
 				"painter-image-webgl2.frag.essl"
 			],
 			"type": "shader",
@@ -238,6 +181,7 @@
 			"name": "painter_image_vert",
 			"files": [
 				"painter-image.vert.essl",
+				"painter-image-relaxed.vert.essl",
 				"painter-image-webgl2.vert.essl"
 			],
 			"type": "shader",
@@ -304,9 +248,72 @@
 			]
 		},
 		{
+			"name": "painter_colored_vert",
+			"files": [
+				"painter-colored.vert.essl",
+				"painter-colored-relaxed.vert.essl",
+				"painter-colored-webgl2.vert.essl"
+			],
+			"type": "shader",
+			"inputs": [
+				{
+					"name": "vertexPosition",
+					"type": "vec3"
+				},
+				{
+					"name": "vertexColor",
+					"type": "vec4"
+				},
+				{
+					"name": "gl_VertexID",
+					"type": "int"
+				},
+				{
+					"name": "gl_InstanceID",
+					"type": "int"
+				}
+			],
+			"outputs": [
+				{
+					"name": "fragmentColor",
+					"type": "vec4"
+				}
+			],
+			"uniforms": [
+				{
+					"name": "projectionMatrix",
+					"type": "mat4"
+				}
+			],
+			"types": [
+				{
+					"name": "gl_PerVertex",
+					"members": [
+						{
+							"type": "vec4",
+							"name": "gl_Position"
+						},
+						{
+							"type": "float",
+							"name": "gl_PointSize"
+						},
+						{
+							"type": "float[]",
+							"name": "gl_ClipDistance"
+						},
+						{
+							"type": "float[]",
+							"name": "gl_CullDistance"
+						}
+					]
+				}
+			]
+		},
+		{
 			"name": "painter_text_frag",
 			"files": [
 				"painter-text.frag.essl",
+				"painter-text-relaxed.frag.essl",
 				"painter-text-webgl2.frag.essl"
 			],
 			"type": "shader",
@@ -338,6 +345,7 @@
 			"name": "painter_text_vert",
 			"files": [
 				"painter-text.vert.essl",
+				"painter-text-relaxed.vert.essl",
 				"painter-text-webgl2.vert.essl"
 			],
 			"type": "shader",
@@ -407,6 +415,7 @@
 			"name": "painter_video_frag",
 			"files": [
 				"painter-video.frag.essl",
+				"painter-video-relaxed.frag.essl",
 				"painter-video-webgl2.frag.essl"
 			],
 			"type": "shader",
@@ -438,6 +447,7 @@
 			"name": "painter_video_vert",
 			"files": [
 				"painter-video.vert.essl",
+				"painter-video-relaxed.vert.essl",
 				"painter-video-webgl2.vert.essl"
 			],
 			"type": "shader",

@@ -1,0 +1,15 @@
+#version 450
+precision mediump float;
+precision mediump int;
+
+uniform mediump sampler2D tex;
+
+in vec2 texCoord;
+out vec4 FragColor;
+
+void main()
+{
+    vec4 texcolor = texture(tex, texCoord);
+    FragColor = texcolor;
+}
+

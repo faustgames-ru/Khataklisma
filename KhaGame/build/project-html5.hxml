@@ -17,13 +17,10 @@
 -D canvas_id=khanvas
 -D script_name=kha
 -D kha_webgl
--D sys_debug-html5
--D kha_debug-html5
--D kha_debug-html5_js
--D sys_debug_html5
--D kha_debug_html5
+-D sys_html5
+-D kha_html5
+-D kha_html5_js
 -D kha
 -D kha_version=1611
--js debug-html5\kha.js
--debug
+-js html5\kha.js
 -main Main
