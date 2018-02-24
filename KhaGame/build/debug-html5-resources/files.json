@@ -17,6 +17,13 @@
 			"original_height": 1329
 		},
 		{
+			"name": "calibri_fnt",
+			"files": [
+				"calibri.fnt"
+			],
+			"type": "blob"
+		},
+		{
 			"name": "calibri_0",
 			"files": [
 				"calibri_0.png"
@@ -24,13 +31,6 @@
 			"type": "image",
 			"original_width": 512,
 			"original_height": 512
-		},
-		{
-			"name": "calibri_fnt",
-			"files": [
-				"calibri.fnt"
-			],
-			"type": "blob"
 		},
 		{
 			"name": "painter_texture_frag",

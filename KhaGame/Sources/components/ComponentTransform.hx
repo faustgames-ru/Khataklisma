@@ -17,7 +17,7 @@ class ComponentTransform implements IComponent
 
 	public function getSystemId(): Int
 	{
-		return EntitySystem.SytemTransformID;
+		return EntitySystem.SytemTransformId;
 	}
 
 	public function load(e: LoadContext): Void

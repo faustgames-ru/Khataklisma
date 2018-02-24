@@ -16,7 +16,7 @@ class FpsCounter implements IComponent
 
 	public function getSystemId(): Int
 	{
-		return EntitySystem.SytemBehaviorID;
+		return EntitySystem.SytemBehaviorId;
 	};
 
 	public function load(e: LoadContext): Void

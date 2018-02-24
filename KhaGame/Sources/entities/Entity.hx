@@ -4,10 +4,12 @@ import Std;
 
 class Entity
 {
+	public var Enabled: Bool;
 	public var Components = new List<IComponent>();
 
 	public function new(components: Array<IComponent>)
 	{
+		Enabled = true;
 		add(components);
 	}
 

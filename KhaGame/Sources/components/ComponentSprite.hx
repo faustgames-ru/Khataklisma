@@ -10,14 +10,16 @@ class ComponentSprite implements IComponent
 {
 	public var Transform: ComponentTransform;
 	public var Image: ResourceImage;
+	public var Layer: Int = 0;
 
 	public function getSystemId(): Int
 	{
-		return EntitySystem.SytemRenderID;
+		return EntitySystem.SytemRenderId;
 	};
 
-	public function new (image: ResourceImage)
+	public function new (layer: Int, image: ResourceImage)
 	{
+		Layer = layer;
 		Image = image;
 	}
 
@@ -28,6 +30,6 @@ class ComponentSprite implements IComponent
 
 	public function update(e: UpdateContext): Void
 	{
-		Image.draw(e.Render, Transform.Value);
+		Image.draw(Layer, e.Render, Transform.Value);
 	}
 }

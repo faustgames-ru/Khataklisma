@@ -66,7 +66,7 @@ class ResourceFont
 		return result;
 	}
 
-	public function draw(render: IRenderService, transform: Transform, text: String): Void
+	public function draw(layer: Int, render: IRenderService, transform: Transform, text: String): Void
 	{
 		var i: Int = 0;
 		var x: Float = 0;
@@ -77,7 +77,7 @@ class ResourceFont
 			var glyph = Glyphs.get(ch);
 			t.X = transform.X + x + glyph.RenderXOffset*t.ScaleX;
 			t.Y = transform.Y + glyph.RenderYOffset*t.ScaleY;
-			glyph.Texture.draw(render, t);
+			glyph.Texture.draw(layer, render, t);
 			x += glyph.XAdvance*t.ScaleX;
 			i++;
 		};

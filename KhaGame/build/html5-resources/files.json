@@ -8,6 +8,15 @@
 			"type": "blob"
 		},
 		{
+			"name": "all_scene_images",
+			"files": [
+				"all_scene_images.png"
+			],
+			"type": "image",
+			"original_width": 2048,
+			"original_height": 1329
+		},
+		{
 			"name": "calibri_fnt",
 			"files": [
 				"calibri.fnt"
@@ -22,15 +31,6 @@
 			"type": "image",
 			"original_width": 512,
 			"original_height": 512
-		},
-		{
-			"name": "all_scene_images",
-			"files": [
-				"all_scene_images.png"
-			],
-			"type": "image",
-			"original_width": 2048,
-			"original_height": 1329
 		},
 		{
 			"name": "painter_texture_vert",
@@ -178,76 +178,6 @@
 			"types": []
 		},
 		{
-			"name": "painter_image_vert",
-			"files": [
-				"painter-image.vert.essl",
-				"painter-image-relaxed.vert.essl",
-				"painter-image-webgl2.vert.essl"
-			],
-			"type": "shader",
-			"inputs": [
-				{
-					"name": "vertexPosition",
-					"type": "vec3"
-				},
-				{
-					"name": "texPosition",
-					"type": "vec2"
-				},
-				{
-					"name": "vertexColor",
-					"type": "vec4"
-				},
-				{
-					"name": "gl_VertexID",
-					"type": "int"
-				},
-				{
-					"name": "gl_InstanceID",
-					"type": "int"
-				}
-			],
-			"outputs": [
-				{
-					"name": "texCoord",
-					"type": "vec2"
-				},
-				{
-					"name": "color",
-					"type": "vec4"
-				}
-			],
-			"uniforms": [
-				{
-					"name": "projectionMatrix",
-					"type": "mat4"
-				}
-			],
-			"types": [
-				{
-					"name": "gl_PerVertex",
-					"members": [
-						{
-							"type": "vec4",
-							"name": "gl_Position"
-						},
-						{
-							"type": "float",
-							"name": "gl_PointSize"
-						},
-						{
-							"type": "float[]",
-							"name": "gl_ClipDistance"
-						},
-						{
-							"type": "float[]",
-							"name": "gl_CullDistance"
-						}
-					]
-				}
-			]
-		},
-		{
 			"name": "painter_colored_vert",
 			"files": [
 				"painter-colored.vert.essl",
@@ -340,6 +270,76 @@
 				}
 			],
 			"types": []
+		},
+		{
+			"name": "painter_image_vert",
+			"files": [
+				"painter-image.vert.essl",
+				"painter-image-relaxed.vert.essl",
+				"painter-image-webgl2.vert.essl"
+			],
+			"type": "shader",
+			"inputs": [
+				{
+					"name": "vertexPosition",
+					"type": "vec3"
+				},
+				{
+					"name": "texPosition",
+					"type": "vec2"
+				},
+				{
+					"name": "vertexColor",
+					"type": "vec4"
+				},
+				{
+					"name": "gl_VertexID",
+					"type": "int"
+				},
+				{
+					"name": "gl_InstanceID",
+					"type": "int"
+				}
+			],
+			"outputs": [
+				{
+					"name": "texCoord",
+					"type": "vec2"
+				},
+				{
+					"name": "color",
+					"type": "vec4"
+				}
+			],
+			"uniforms": [
+				{
+					"name": "projectionMatrix",
+					"type": "mat4"
+				}
+			],
+			"types": [
+				{
+					"name": "gl_PerVertex",
+					"members": [
+						{
+							"type": "vec4",
+							"name": "gl_Position"
+						},
+						{
+							"type": "float",
+							"name": "gl_PointSize"
+						},
+						{
+							"type": "float[]",
+							"name": "gl_ClipDistance"
+						},
+						{
+							"type": "float[]",
+							"name": "gl_CullDistance"
+						}
+					]
+				}
+			]
 		},
 		{
 			"name": "painter_text_vert",

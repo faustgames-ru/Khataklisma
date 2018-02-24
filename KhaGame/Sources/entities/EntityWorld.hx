@@ -28,9 +28,11 @@ class EntityWorld
 		// todo: filt visible entities for update in systems
 		for (i in _entities)
 		{
+			if (!i.Enabled) continue;
 			for (c in i.Components)
 			{
 				var systemId = c.getSystemId();
+				if (systemId < 0) continue;
 				_systems[systemId].add(c);
 			}
 		}

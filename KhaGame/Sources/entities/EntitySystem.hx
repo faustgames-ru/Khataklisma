@@ -4,9 +4,10 @@ import List;
 
 class EntitySystem
 {
-	public static var SytemBehaviorID: Int = 0;
-	public static var SytemTransformID: Int = 1;
-	public static var SytemRenderID: Int = 2;
+	public static var SytemNoneId: Int = -1;
+	public static var SytemBehaviorId: Int = 0;
+	public static var SytemTransformId: Int = 1;
+	public static var SytemRenderId: Int = 2;
 	
 	public function new()
 	{

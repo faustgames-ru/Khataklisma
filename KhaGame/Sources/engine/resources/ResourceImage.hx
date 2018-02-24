@@ -75,9 +75,9 @@ class ResourceImage
 		return result;
 	}
 
-	public function draw(render: IRenderService, transform: Transform): Void
+	public function draw(layer: Int, render: IRenderService, transform: Transform): Void
 	{
-		render.drawImage(Texture, Vertices, Indices, transform);
+		render.drawImage(layer, Texture, Vertices, Indices, transform);
 	}
 
 	private function new()

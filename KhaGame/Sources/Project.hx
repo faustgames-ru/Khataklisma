@@ -7,22 +7,27 @@ import kha.Assets;
 import utils.Statistics;
 import engine.render.IRenderService;
 import engine.render.RenderService;
+import engine.render.RenderLayer;
 import engine.resources.ResourceFont;
 import engine.resources.ResourceAtlas;
 import engine.resources.ResourcesManager;
+import engine.input.MotionsManager;
 import entities.EntityWorld;
 import entities.UpdateContext;
 import entities.LoadContext;
 
-class Project {	
+class Project 
+{	
 	public function new() 
 	{
 		_frequency = 1 / 60;
 		_render = new RenderService();		
 		_resources = new ResourcesManager();
-		_updateContext = new UpdateContext(_render, _frequency);
+		_motions = new MotionsManager();
+		_inputBroker = new InputBroker(_motions);		
+		_updateContext = new UpdateContext(_render, _motions, _frequency);
 		System.notifyOnRender(render);
-		Scheduler.addTimeTask(update, 0, _frequency);		
+		Scheduler.addTimeTask(update, 0, _frequency);				
 		Assets.loadEverything(afterLoadAssets);
 	}
 
@@ -30,8 +35,8 @@ class Project {
 	{
 		_resources.DefaultFont = ResourceFont.fromBlob(Assets.blobs.calibri_fnt, Assets.images.calibri_0);
 		_resources.ResourceAtlas = ResourceAtlas.fromBlob(Assets.blobs.all_scene_images_json, Assets.images.all_scene_images);
-		_world = new EntityWorld(new LoadContext(_resources));
-		
+		_world = new EntityWorld(new LoadContext(_resources, _motions));
+		_world.addEntity(EntityFactory.Camera());
 		var exx:Float = 50;
 		var exy:Float = -25;
 		
@@ -43,13 +48,13 @@ class Project {
 
 		for (l in 0...2)
 		{
-			for (x in -20...21)
+			for (x in -8...9)
 			{
-				for (y in -20...21)
+				for (y in -8...9)
 				{
 					var sx = cx + exx*x + eyx*y;
 					var sy = cy + exy*x + eyy*y;
-					_world.addEntity(EntityFactory.Sprite(sx, sy, 
+					_world.addEntity(EntityFactory.Sprite(RenderLayer.GameLayer0, sx, sy, 
 						_resources.ResourceAtlas.Frames.get("buildingTiles_000.png")));
 				}
 			}
@@ -59,7 +64,13 @@ class Project {
 
 	function update(): Void 
 	{		
+		updateInternal();
+	}
+
+	function updateInternal(): Void 
+	{		
 		if (_world == null) return;
+		_motions.update();
 		_world.update(_updateContext);
 	}
 
@@ -74,5 +85,7 @@ class Project {
 	private var _world: EntityWorld;
 	private var _frequency: Float;
 	private var _updateContext: UpdateContext;
+	private var _inputBroker: InputBroker;
+	private var _motions: MotionsManager;
 }
  

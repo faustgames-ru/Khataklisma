@@ -9,17 +9,18 @@ import engine.resources.ResourceFont;
 class ComponentText implements IComponent
 {
 	public var Text: String;
+	public var Layer: Int;
 	public var Font: ResourceFont;
 	public var Transform: ComponentTransform;
 
 	public function getSystemId(): Int
 	{
-		return EntitySystem.SytemRenderID;
+		return EntitySystem.SytemRenderId;
 	};
 
-	public function new ()
+	public function new (layer: Int)
 	{
-
+		Layer = layer;
 	}
 
 	public function load(e: LoadContext): Void
@@ -30,6 +31,6 @@ class ComponentText implements IComponent
 
 	public function update(e: UpdateContext): Void
 	{
-		Font.draw(e.Render, Transform.Value, Text);
+		Font.draw(Layer, e.Render, Transform.Value, Text);
 	}
 }

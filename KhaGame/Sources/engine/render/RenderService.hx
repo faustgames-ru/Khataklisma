@@ -32,18 +32,17 @@ class RenderService implements IRenderService
 	var _indicesCount: Int;
 	var _verticesCount: Int;
 	var _structureLength: Int;
-	var _transfom: FastMatrix4;	
-	var _entries: List<RenderEntry>;
+	var _layers: Vector<RenderLayer>;	
 
 	var _vbCache: Float32Array;
 	var _ibCache: Uint32Array;
 	
-	var _vLimit: Int = 1024*1024;
-	var _iLimit: Int = 1024*1024;
+	var _vLimit: Int = 64*1024;
+	var _iLimit: Int = 64*1024;
+	var _layersLimit: Int = 10;
 
 	public function new()
 	{
-
 		var structure = new VertexStructure();
 		structure.add('xy', VertexData.Float2);
 		structure.add('uv', VertexData.Float2);
@@ -72,31 +71,38 @@ class RenderService implements IRenderService
 		
 		_ib = new IndexBuffer(_iLimit, Usage.DynamicUsage);
 		
-		_transfom = FastMatrix4.identity();
-	 	_entries = new List<RenderEntry>();
+	 	_layers = new Vector<RenderLayer>(_layersLimit);
+		for (i in 0..._layers.length)
+		{
+			_layers[i] = new RenderLayer();
+		}
 	}
 
 	public function begin(): Void
 	{
-		_entries.clear();
+		for (e in _layers)
+		{
+			e.clear();
+		}
 		_indicesCount = 0;
 		_verticesCount = 0;
 	}
 
-	public function drawImage(texture: Image, vertices: Vector<Float>, indices: Vector<Int>, transform: Transform): Void
+	public function drawImage(layer: Int, texture: Image, vertices: Vector<Float>, indices: Vector<Int>, transform: Transform): Void
 	{
-		if (_entries.isEmpty())
+		var entries = _layers.get(layer).Entries;
+		if (entries.isEmpty())
 		{
-			_entries.add( new RenderEntry(_indicesCount, texture));
+			entries.add( new RenderEntry(_indicesCount, texture));
 		}
 		else
 		{
-			if ( _entries.last().Texture != texture)
+			if ( entries.last().Texture != texture)
 			{
-				_entries.add( new RenderEntry(_indicesCount, texture));
+				entries.add( new RenderEntry(_indicesCount, texture));
 			}
 		}
-		var entry = _entries.last();
+		var entry = entries.last();
 		
 		if ((_verticesCount + vertices.length)*_structureLength > _vLimit) 
 		{
@@ -137,6 +143,11 @@ class RenderService implements IRenderService
 	{
 	}
 
+	public function setTransform(layer: Int, trasform: FastMatrix4): Void 
+	{
+		_layers.get(layer).Transform = trasform;
+	}
+
 	public function apply(framebuffer: Framebuffer): Void 
 	{
 		var lockCount = _verticesCount*_structureLength;
@@ -154,19 +165,25 @@ class RenderService implements IRenderService
 		}
 		_ib.unlock();
 
-		_transfom = FastMatrix4.orthogonalProjection(0, framebuffer.width, 0, framebuffer.height, -1, 1);
 		var g = framebuffer.g4;
 		g.begin();
 		g.clear(Color.fromFloats(0.0, 0.0, 0.3), 1.0);
 		g.setVertexBuffer(_vb);
 		g.setIndexBuffer(_ib);
 		g.setPipeline(_pipeline);
-		g.setMatrix(_transfomID, _transfom);
-		for (entry in _entries) 
+
+		for (layer in _layers) 
 		{
-			g.setTexture(_textureID, entry.Texture); 
-			g.drawIndexedVertices(entry.Start, entry.Count);
-    	}
+			if (layer.Entries.isEmpty())
+				continue;
+			var transform = FastMatrix4.orthogonalProjection(0, framebuffer.width, 0, framebuffer.height, -1, 1).multmat(layer.Transform);
+			g.setMatrix(_transfomID, transform);
+			for (entry in layer.Entries) 
+			{
+				g.setTexture(_textureID, entry.Texture); 
+				g.drawIndexedVertices(entry.Start, entry.Count);
+			}
+		}
 		g.end();
 	}
 }
