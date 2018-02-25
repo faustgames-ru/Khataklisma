@@ -7,6 +7,8 @@ class Transform
 	public var ScaleX: Float;
 	public var ScaleY: Float;
 
+	public static var empty: Transform = new Transform(0, 0, 1, 1);
+	
 	public static function fromXY(x: Float, y: Float): Transform
 	{
 		return new Transform(x, y, 1, 1);

@@ -2,6 +2,7 @@ package engine.resources;
 
 import kha.Image;
 import engine.render.IRenderService;
+import engine.Aabb;
 import haxe.ds.Vector;
 
 class ResourceImage
@@ -11,16 +12,25 @@ class ResourceImage
 	public var Indices: Vector<Int>;
 	public var Texture: Image;
 
+	public function hitTest(x: Int, y: Int, transform: Transform): Bool
+	{
+		var sx: Float = Texture.width*transform.ScaleX / 2;
+		var sy: Float = Texture.height*transform.ScaleX / 2;
+		var tx = (x-transform.X);
+		var ty = (y-transform.Y);
+		return -sx <= tx && tx <= sx && -sy <= ty && ty <= sy;
+	}
+
 	public function createSubImage(x: Int, y: Int, w: Int, h: Int): ResourceImage
 	{
 		var result = new ResourceImage();
 		result.Texture = Texture;
 		var sx: Float = w / 2;
 		var sy: Float = h / 2;
-		var tx0: Float = x / (Texture.width - 1);
-		var ty0: Float = y / (Texture.height - 1);
-		var tx1: Float = (x+w-1) / (Texture.width - 1);
-		var ty1: Float = (y+h-1) / (Texture.height - 1);
+		var tx0: Float = x / (Texture.width);
+		var ty0: Float = y / (Texture.height);
+		var tx1: Float = (x+w) / (Texture.width);
+		var ty1: Float = (y+h) / (Texture.height);
 		result.Vertices = Vector.fromArrayCopy(
 		[
 			-sx, -sy, tx0, ty1,
@@ -78,6 +88,11 @@ class ResourceImage
 	public function draw(layer: Int, render: IRenderService, transform: Transform): Void
 	{
 		render.drawImage(layer, Texture, Vertices, Indices, transform);
+	}
+
+	public function drawQuad(layer: Int, render: IRenderService, vertices: Vector<Float>): Void
+	{
+		render.drawImage(layer, Texture, vertices, QuadIndices, Transform.empty);
 	}
 
 	private function new()

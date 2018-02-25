@@ -2,6 +2,7 @@ package engine.resources;
 
 import kha.Blob;
 import kha.Image;
+import kha.math.FastVector2;
 
 import engine.render.IRenderService;
 import engine.resources.ResourceImage;
@@ -66,17 +67,32 @@ class ResourceFont
 		return result;
 	}
 
-	public function draw(layer: Int, render: IRenderService, transform: Transform, text: String): Void
+	public function getSize(text: String): Float
 	{
 		var i: Int = 0;
 		var x: Float = 0;
+		while (i < text.length)
+		{
+			var ch = text.charCodeAt(i);
+			var glyph = Glyphs.get(ch);
+			x += glyph.XAdvance;
+			i++;
+		};
+		return x;
+	}
+
+	public function draw(layer: Int, render: IRenderService, transform: Transform, text: String): Void
+	{
+		var y = -(LineBase - (LineHeight-LineBase))*0.5*transform.ScaleY;
+		var x = -getSize(text)*0.5*transform.ScaleX;
 		var t = transform.clone();
+		var i: Int = 0;
 		while (i < text.length)
 		{
 			var ch = text.charCodeAt(i);
 			var glyph = Glyphs.get(ch);
 			t.X = transform.X + x + glyph.RenderXOffset*t.ScaleX;
-			t.Y = transform.Y + glyph.RenderYOffset*t.ScaleY;
+			t.Y = transform.Y + y + glyph.RenderYOffset*t.ScaleY;
 			glyph.Texture.draw(layer, render, t);
 			x += glyph.XAdvance*t.ScaleX;
 			i++;

@@ -17,6 +17,13 @@
 			"original_height": 1329
 		},
 		{
+			"name": "buildings_json",
+			"files": [
+				"buildings.json"
+			],
+			"type": "blob"
+		},
+		{
 			"name": "calibri_fnt",
 			"files": [
 				"calibri.fnt"
@@ -31,6 +38,24 @@
 			"type": "image",
 			"original_width": 512,
 			"original_height": 512
+		},
+		{
+			"name": "red_button",
+			"files": [
+				"red_button.png"
+			],
+			"type": "image",
+			"original_width": 120,
+			"original_height": 120
+		},
+		{
+			"name": "green_button1",
+			"files": [
+				"green_button1.png"
+			],
+			"type": "image",
+			"original_width": 120,
+			"original_height": 120
 		},
 		{
 			"name": "tiles_json",

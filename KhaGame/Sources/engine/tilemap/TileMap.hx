@@ -13,17 +13,21 @@ import kha.math.Vector2i;
 
 class TileMap
 {
-	public var Tiles: ResourceTileMap;
+	public var Tiles: TileStruct;
 	public var Axis: FastMatrix2;
+	public var Palette: TilesPalette;
 
-	public function new(tiles: ResourceTileMap, transform: FastMatrix2)
+	public function new(tiles: TileStruct, transform: FastMatrix2, palette: TilesPalette)
 	{
 		Tiles = tiles;
 		Axis = transform;
+		Palette = palette;
 	}
 
-	public function query(frustum: Aabb, resultTiles: Vector<TileInfo>): Int
+	public function query(frustum: Aabb, resultTiles: TileInfos): Void
 	{
+		resultTiles.clear();
+
 		var inverse: FastMatrix2 = MathHelpers.inverseMatrix2(Axis);
 
 		var invf = Aabb.fromVertices2([
@@ -47,9 +51,7 @@ class TileMap
 			while (y >= minY && x <= maxX)
 			{
 				if (!walker.Walk(x, y)) 
-				{
-					return resultTiles.length;
-				}
+					return;
 				x++;
 				y--;
 			}
@@ -64,64 +66,53 @@ class TileMap
 			while (y >= minY && x <= maxX)
 			{
 				if (!walker.Walk(x, y)) 
-				{
-					return resultTiles.length;
-				}
+					return;
 				x++;
 				y--;
 			}
 			posX++;
-		}
-	
-		return walker.Index;
+		}	
 	}
 
-	public function renderTiles(frustum: Aabb, render: IRenderService, resultTiles: Vector<TileInfo>, count: Int, palette: TilesPalette): Void
+	public function renderTiles(layer:Int, render: IRenderService, resultTiles: TileInfos): Void
 	{
 		var t = Transform.fromXY(0, 0);
-		for (i in 0...count)
+		for (i in 0...resultTiles.Count)
 		{
-			var tile = resultTiles[i];
+			var tile = resultTiles.Data[i];
 			t.X = tile.RenderX;
 			t.Y = tile.RenderY;
-			var image = palette.Data[tile.Value];
+			var image = Palette.Data[tile.Value];
 			if (image == null) continue;
-			image.draw(RenderLayer.GameLayer0, render, t);
+			image.draw(layer, render, t);
 		}
 	}
 }
 
 class TilesWalker
 {
-	public var ResultTiles: Vector<TileInfo>;
+	public var ResultTiles: TileInfos;
 	public var Frustum: Aabb;
 	public var Index: Int = 0;
 	public var Axis: FastMatrix2;
-	public var Tiles: ResourceTileMap;
+	public var Tiles: TileStruct;
 	public var p: FastVector2 = new FastVector2(0, 0);
-	public function new(frustum: Aabb, resultTiles: Vector<TileInfo>, axis: FastMatrix2, tiles: ResourceTileMap)
+
+	public function new(frustum: Aabb, resultTiles: TileInfos, axis: FastMatrix2, tiles: TileStruct)
 	{
 		Frustum = frustum;
 		ResultTiles = resultTiles;
 		Axis = axis;
 		Tiles = tiles;
 	}
+
 	public function Walk(x: Int, y: Int): Bool
 	{
-		if (Index >= ResultTiles.length) 
-			return false;
 		p.x = x;
 		p.y = y;
 		var ps = Axis.multvec(p);
 		if (!Frustum.include(ps.x, ps.y))
 			return true; 
-		var tile =ResultTiles[Index];
-		tile.X = x;
-		tile.Y = y;
-		tile.RenderX = ps.x;
-		tile.RenderY = ps.y;
-		tile.Value = Tiles.get(x, y);
-		Index++;
-		return true;
+		return ResultTiles.add(x, y, ps.x, ps.y, Tiles.get(x, y));
 	}
 }

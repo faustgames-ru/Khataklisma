@@ -8,6 +8,22 @@
 			"type": "blob"
 		},
 		{
+			"name": "all_scene_images",
+			"files": [
+				"all_scene_images.png"
+			],
+			"type": "image",
+			"original_width": 2048,
+			"original_height": 1329
+		},
+		{
+			"name": "buildings_json",
+			"files": [
+				"buildings.json"
+			],
+			"type": "blob"
+		},
+		{
 			"name": "calibri_fnt",
 			"files": [
 				"calibri.fnt"
@@ -24,20 +40,29 @@
 			"original_height": 512
 		},
 		{
+			"name": "green_button1",
+			"files": [
+				"green_button1.png"
+			],
+			"type": "image",
+			"original_width": 120,
+			"original_height": 120
+		},
+		{
+			"name": "red_button",
+			"files": [
+				"red_button.png"
+			],
+			"type": "image",
+			"original_width": 120,
+			"original_height": 120
+		},
+		{
 			"name": "tiles_json",
 			"files": [
 				"tiles.json"
 			],
 			"type": "blob"
-		},
-		{
-			"name": "all_scene_images",
-			"files": [
-				"all_scene_images.png"
-			],
-			"type": "image",
-			"original_width": 2048,
-			"original_height": 1329
 		},
 		{
 			"name": "painter_texture_frag",
@@ -247,38 +272,6 @@
 			"types": []
 		},
 		{
-			"name": "painter_text_frag",
-			"files": [
-				"painter-text.frag.essl",
-				"painter-text-relaxed.frag.essl",
-				"painter-text-webgl2.frag.essl"
-			],
-			"type": "shader",
-			"inputs": [
-				{
-					"name": "fragmentColor",
-					"type": "vec4"
-				},
-				{
-					"name": "texCoord",
-					"type": "vec2"
-				}
-			],
-			"outputs": [
-				{
-					"name": "FragColor",
-					"type": "vec4"
-				}
-			],
-			"uniforms": [
-				{
-					"name": "tex",
-					"type": "sampler2D"
-				}
-			],
-			"types": []
-		},
-		{
 			"name": "painter_image_vert",
 			"files": [
 				"painter-image.vert.essl",
@@ -347,6 +340,38 @@
 					]
 				}
 			]
+		},
+		{
+			"name": "painter_text_frag",
+			"files": [
+				"painter-text.frag.essl",
+				"painter-text-relaxed.frag.essl",
+				"painter-text-webgl2.frag.essl"
+			],
+			"type": "shader",
+			"inputs": [
+				{
+					"name": "fragmentColor",
+					"type": "vec4"
+				},
+				{
+					"name": "texCoord",
+					"type": "vec2"
+				}
+			],
+			"outputs": [
+				{
+					"name": "FragColor",
+					"type": "vec4"
+				}
+			],
+			"uniforms": [
+				{
+					"name": "tex",
+					"type": "sampler2D"
+				}
+			],
+			"types": []
 		},
 		{
 			"name": "painter_text_vert",

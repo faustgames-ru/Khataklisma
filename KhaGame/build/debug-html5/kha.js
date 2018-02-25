@@ -37,17 +37,28 @@ EReg.prototype = {
 var EntityFactory = function() { };
 $hxClasses["EntityFactory"] = EntityFactory;
 EntityFactory.__name__ = ["EntityFactory"];
-EntityFactory.tilemap = function(tiles,palette) {
-	return new entities_Entity([new components_ComponentTileMap(engine_render_RenderLayer.GameLayer0,tiles,palette)]);
+EntityFactory.tilemap = function(tiles,palette,buildings) {
+	var transform = new kha_math_FastMatrix2(64,-64,-32,-32);
+	var tilesMap = new engine_tilemap_TileMap(tiles,transform,palette);
+	var tilesRender = new engine_tilemap_TileInfos(16384);
+	var buildingsStates = engine_tilemap_TileStruct.fromValue(tiles.SizeX,tiles.SizeY,0);
+	var buildingsInstances = [];
+	return new entities_Entity([new behaviors_buildings_Buildings(tilesMap,buildingsStates,tilesRender,buildings,buildingsInstances),new components_ComponentTilesRender(engine_render_RenderLayer.GameLayer0,tilesMap,tilesRender),new behaviors_buildings_BuildingsRender(engine_render_RenderLayer.GameLayer1,buildingsStates,tilesRender,buildings,buildingsInstances)]);
 };
 EntityFactory.sprite = function(layer,x,y,image) {
 	return new entities_Entity([new components_ComponentTransform(engine_Transform.fromXY(x,y)),new components_ComponentSprite(layer,image)]);
 };
+EntityFactory.guiPanel = function(aabb,image) {
+	return new entities_Entity([new components_ComponentGuiRect(engine_render_RenderLayer.GuiLayer,aabb,image)]);
+};
 EntityFactory.camera = function() {
 	return new entities_Entity([new behaviors_Camera()]);
 };
+EntityFactory.addButton = function(x,y,image,title,buildings,count) {
+	return new entities_Entity([new components_ComponentTransform(engine_Transform.fromXYScale(x,y,0.7,0.7)),new components_ComponentSprite(engine_render_RenderLayer.GuiLayer,image),new components_ComponentText(engine_render_RenderLayer.GuiLayer,title),new behaviors_AddButton(buildings,count)]);
+};
 EntityFactory.fpsCounter = function(x,y) {
-	return new entities_Entity([new components_ComponentTransform(engine_Transform.fromXY(x,y)),new components_ComponentText(engine_render_RenderLayer.GuiLayer),new behaviors_FpsCounter()]);
+	return new entities_Entity([new components_ComponentTransform(engine_Transform.fromXYScale(x,y,1.0,1.0)),new components_ComponentText(engine_render_RenderLayer.GuiLayer,"fps:"),new behaviors_FpsCounter()]);
 };
 var HxOverrides = function() { };
 $hxClasses["HxOverrides"] = HxOverrides;
@@ -272,11 +283,28 @@ Project.prototype = {
 		this._resources.DefaultFont = engine_resources_ResourceFont.fromBlob(kha_Assets.blobs.calibri_fnt,kha_Assets.images.calibri_0);
 		this._resources.DefaultAtlas = engine_resources_ResourceAtlas.fromBlob(kha_Assets.blobs.all_scene_images_json,kha_Assets.images.all_scene_images);
 		this._resources.DefaultTiles = engine_resources_ResourceTileMap.fromBlob(kha_Assets.blobs.tiles_json);
+		var redButtonSprite = engine_resources_ResourceImage.fromImage(kha_Assets.images.red_button);
+		var greenButtonSprite = engine_resources_ResourceImage.fromImage(kha_Assets.images.green_button1);
+		var palette = new engine_tilemap_TilesPalette("landscapeTiles_",".png",this._resources.DefaultAtlas);
+		var gen = this.createBuildingsGen();
+		var buildings = gen.genAll();
 		this._world = new entities_EntityWorld(new entities_LoadContext(this._resources,this._motions));
 		this._world.addEntity(EntityFactory.camera());
-		var palette = new engine_tilemap_TilesPalette("landscapeTiles_",".png",this._resources.DefaultAtlas);
-		this._world.addEntity(EntityFactory.tilemap(this._resources.DefaultTiles,palette));
-		this._world.addEntity(EntityFactory.fpsCounter(-502,-370));
+		var tileMap = EntityFactory.tilemap(this._resources.DefaultTiles.Data,palette,buildings);
+		var buildings1 = tileMap.get(behaviors_buildings_Buildings);
+		this._world.addEntity(tileMap);
+		this._world.addEntity(EntityFactory.addButton(-450,-300,redButtonSprite,"-1000",buildings1,-1000));
+		this._world.addEntity(EntityFactory.addButton(-450,-200,redButtonSprite,"-100",buildings1,-100));
+		this._world.addEntity(EntityFactory.addButton(-450,-100,redButtonSprite,"-1",buildings1,-1));
+		this._world.addEntity(EntityFactory.addButton(450,-300,greenButtonSprite,"+1000",buildings1,1000));
+		this._world.addEntity(EntityFactory.addButton(450,-200,greenButtonSprite,"+100",buildings1,100));
+		this._world.addEntity(EntityFactory.addButton(450,-100,greenButtonSprite,"+1",buildings1,1));
+		this._world.addEntity(EntityFactory.fpsCounter(0,350));
+	}
+	,createBuildingsGen: function() {
+		var config = JSON.parse(kha_Assets.blobs.buildings_json.toString());
+		var gen = new behaviors_buildings_BuildingGen(this._resources.DefaultAtlas,config);
+		return gen;
 	}
 	,update: function() {
 		this.updateInternal();
@@ -285,11 +313,13 @@ Project.prototype = {
 		if(this._world == null) {
 			return;
 		}
-		this._motions.update();
+		this._motions.update(this._updateContext);
 		this._world.update(this._updateContext);
 	}
 	,render: function(framebuffer) {
 		utils_Statistics.Instance.reportRenderFrame(kha_Scheduler.realTime());
+		this._updateContext.Viewport.Width = framebuffer.get_width();
+		this._updateContext.Viewport.Height = framebuffer.get_height();
 		this._render.apply(framebuffer);
 	}
 	,_render: null
@@ -333,6 +363,13 @@ Std.parseInt = function(x) {
 		return null;
 	}
 	return v;
+};
+Std.random = function(x) {
+	if(x <= 0) {
+		return 0;
+	} else {
+		return Math.floor(Math.random() * x);
+	}
 };
 var StringBuf = function() {
 	this.b = "";
@@ -610,9 +647,52 @@ entities_IComponent.prototype = {
 	,update: null
 	,__class__: entities_IComponent
 };
+var behaviors_AddButton = function(buildings,count) {
+	this.Buildings = buildings;
+	this.Count = count;
+};
+$hxClasses["behaviors.AddButton"] = behaviors_AddButton;
+behaviors_AddButton.__name__ = ["behaviors","AddButton"];
+behaviors_AddButton.__interfaces__ = [engine_input_IMotionHandler,entities_IComponent];
+behaviors_AddButton.prototype = {
+	Transform: null
+	,Sprite: null
+	,Buildings: null
+	,Count: null
+	,getSystemId: function() {
+		return entities_EntitySystem.SytemBehaviorId;
+	}
+	,load: function(e) {
+		e.Motions.addHandler(this);
+		this.Transform = e.Owner.get(components_ComponentTransform);
+		this.Sprite = e.Owner.get(components_ComponentSprite);
+	}
+	,update: function(e) {
+	}
+	,proirity: function() {
+		return 0;
+	}
+	,motionStart: function(x,y) {
+		if(this.Sprite.Image.hitTest(x,y,this.Transform.Value)) {
+			if(this.Count > 0) {
+				this.Buildings.spawnBuildings(this.Count);
+			} else if(this.Count < 0) {
+				this.Buildings.removeBuildings(-this.Count);
+			}
+			return engine_input_MotionHandleMode.Handled;
+		}
+		return engine_input_MotionHandleMode.None;
+	}
+	,motionMove: function(x,y) {
+		return engine_input_MotionHandleMode.Joint;
+	}
+	,motionEnd: function(x,y) {
+	}
+	,__class__: behaviors_AddButton
+};
 var behaviors_Camera = function() {
-	this._cameraX = 0;
-	this._cameraY = 0;
+	this._cameraX = this._cameraTargetX = 0;
+	this._cameraY = this._cameraTargetY = 3000;
 	var this1 = new Array(5);
 	this._moveHistory = this1;
 	var _g1 = 0;
@@ -640,8 +720,12 @@ behaviors_Camera.prototype = {
 		this._cameraX = engine_MathHelpers.lerp(this._cameraX,this._cameraTargetX,engine_MathHelpers.saturate(e.EllapsetTime * 4));
 		this._cameraY = engine_MathHelpers.lerp(this._cameraY,this._cameraTargetY,engine_MathHelpers.saturate(e.EllapsetTime * 4));
 		this.updateHistory(this._cameraX,this._cameraY);
-		e.Frustum = engine_Aabb.fromXYSize(-this._cameraX,-this._cameraY,640,480);
-		e.Render.setTransform(0,new kha_math_FastMatrix4(1,0,0,this._cameraX,0,1,0,this._cameraY,0,0,1,0,0,0,0,1));
+		var w = e.Viewport.Width * 0.5;
+		var h = e.Viewport.Height * 0.5;
+		e.Frustum = engine_Aabb.fromXYSize(-this._cameraX,-this._cameraY - 96,w + 128,h + 128);
+		var transform = new kha_math_FastMatrix4(1,0,0,this._cameraX,0,1,0,this._cameraY,0,0,1,0,0,0,0,1);
+		e.Render.setTransform(0,transform);
+		e.Render.setTransform(1,transform);
 	}
 	,proirity: function() {
 		return 0;
@@ -656,7 +740,7 @@ behaviors_Camera.prototype = {
 	}
 	,motionMove: function(x,y) {
 		this._cameraTargetX = this._cameraX = this._touchCameraX + x - this._touchX;
-		this._cameraTargetY = this._cameraY = this._touchCameraY - y + this._touchY;
+		this._cameraTargetY = this._cameraY = this._touchCameraY + y - this._touchY;
 		return engine_input_MotionHandleMode.Joint;
 	}
 	,motionEnd: function(x,y) {
@@ -727,10 +811,403 @@ behaviors_FpsCounter.prototype = {
 	}
 	,update: function(e) {
 		var fps = utils_Statistics.Instance.LastFpsPerSecond | 0;
-		this._text.Text = "fps: " + fps;
+		var buildings = utils_Statistics.Instance.BuildingsCount | 0;
+		this._text.Text = "fps: " + fps + " buildings: " + buildings;
 	}
 	,_text: null
 	,__class__: behaviors_FpsCounter
+};
+var behaviors_buildings_BuildingDirection = $hxClasses["behaviors.buildings.BuildingDirection"] = { __ename__ : true, __constructs__ : ["N","S","E","W"] };
+behaviors_buildings_BuildingDirection.N = ["N",0];
+behaviors_buildings_BuildingDirection.N.toString = $estr;
+behaviors_buildings_BuildingDirection.N.__enum__ = behaviors_buildings_BuildingDirection;
+behaviors_buildings_BuildingDirection.S = ["S",1];
+behaviors_buildings_BuildingDirection.S.toString = $estr;
+behaviors_buildings_BuildingDirection.S.__enum__ = behaviors_buildings_BuildingDirection;
+behaviors_buildings_BuildingDirection.E = ["E",2];
+behaviors_buildings_BuildingDirection.E.toString = $estr;
+behaviors_buildings_BuildingDirection.E.__enum__ = behaviors_buildings_BuildingDirection;
+behaviors_buildings_BuildingDirection.W = ["W",3];
+behaviors_buildings_BuildingDirection.W.toString = $estr;
+behaviors_buildings_BuildingDirection.W.__enum__ = behaviors_buildings_BuildingDirection;
+var behaviors_buildings_BuildingGen = function(atlas,config) {
+	this._atlas = atlas;
+	this._config = config;
+};
+$hxClasses["behaviors.buildings.BuildingGen"] = behaviors_buildings_BuildingGen;
+behaviors_buildings_BuildingGen.__name__ = ["behaviors","buildings","BuildingGen"];
+behaviors_buildings_BuildingGen.prototype = {
+	create: function(xDir,yDir,basis,stage,roof) {
+		var _this = this._atlas.Frames;
+		var bImg = __map_reserved[basis] != null ? _this.getReserved(basis) : _this.h[basis];
+		var _this1 = this._atlas.Frames;
+		var sImg = __map_reserved[stage] != null ? _this1.getReserved(stage) : _this1.h[stage];
+		var _this2 = this._atlas.Frames;
+		var rImg = __map_reserved[roof] != null ? _this2.getReserved(roof) : _this2.h[roof];
+		return new behaviors_buildings_BuildingResource(bImg,sImg,rImg,48,36,xDir,yDir);
+	}
+	,genAll: function() {
+		var resultList = new List();
+		var _g = 0;
+		var _g1 = this._config;
+		while(_g < _g1.length) {
+			var c = _g1[_g];
+			++_g;
+			this.genAllFromConfig(c,resultList);
+		}
+		var length = resultList.length;
+		var this1 = new Array(length);
+		var result = this1;
+		var i = 0;
+		var _g_head = resultList.h;
+		while(_g_head != null) {
+			var val = _g_head.item;
+			_g_head = _g_head.next;
+			var b = val;
+			result[i] = b;
+			++i;
+		}
+		return result;
+	}
+	,genAllFromConfig: function(config,result) {
+		var _g = 0;
+		var _g1 = config.base;
+		while(_g < _g1.length) {
+			var b = _g1[_g];
+			++_g;
+			var _g2 = 0;
+			var _g3 = config.stage;
+			while(_g2 < _g3.length) {
+				var s = _g3[_g2];
+				++_g2;
+				var _g4 = 0;
+				var _g5 = config.roof;
+				while(_g4 < _g5.length) {
+					var r = _g5[_g4];
+					++_g4;
+					result.add(this.create(config.xDir,config.yDir,b,s,r));
+				}
+			}
+		}
+	}
+	,_config: null
+	,_fileName: null
+	,_ext: null
+	,_atlas: null
+	,__class__: behaviors_buildings_BuildingGen
+};
+var behaviors_buildings_BuildingGenConfig = function() { };
+$hxClasses["behaviors.buildings.BuildingGenConfig"] = behaviors_buildings_BuildingGenConfig;
+behaviors_buildings_BuildingGenConfig.__name__ = ["behaviors","buildings","BuildingGenConfig"];
+behaviors_buildings_BuildingGenConfig.prototype = {
+	xDir: null
+	,yDir: null
+	,base: null
+	,stage: null
+	,roof: null
+	,__class__: behaviors_buildings_BuildingGenConfig
+};
+var behaviors_buildings_BuildingInstance = function(x,y,state) {
+	this.State = state.encode();
+	this.TileAddress = x + (y << 16);
+};
+$hxClasses["behaviors.buildings.BuildingInstance"] = behaviors_buildings_BuildingInstance;
+behaviors_buildings_BuildingInstance.__name__ = ["behaviors","buildings","BuildingInstance"];
+behaviors_buildings_BuildingInstance.prototype = {
+	State: null
+	,TileAddress: null
+	,getX: function() {
+		return this.TileAddress & 65535;
+	}
+	,getY: function() {
+		return (this.TileAddress & -65536) >> 16;
+	}
+	,__class__: behaviors_buildings_BuildingInstance
+};
+var behaviors_buildings_BuildingResource = function(basis,stage,roof,baseH,stageH,xDir,yDir) {
+	this.Base = basis;
+	this.Stage = stage;
+	this.Roof = roof;
+	this.BaseH = baseH;
+	this.StageH = stageH;
+	this.XDir = xDir;
+	this.YDir = yDir;
+};
+$hxClasses["behaviors.buildings.BuildingResource"] = behaviors_buildings_BuildingResource;
+behaviors_buildings_BuildingResource.__name__ = ["behaviors","buildings","BuildingResource"];
+behaviors_buildings_BuildingResource.prototype = {
+	Base: null
+	,Stage: null
+	,Roof: null
+	,XDir: null
+	,YDir: null
+	,BaseH: null
+	,StageH: null
+	,Direction: null
+	,getTiles: function(x,y,size) {
+		if(size == 1) {
+			return [new kha_math_Vector2i(x,y)];
+		}
+		if(size == 2) {
+			return [new kha_math_Vector2i(x,y),new kha_math_Vector2i(x + this.XDir,y + this.YDir)];
+		}
+		return [new kha_math_Vector2i(x - 1,y - 1),new kha_math_Vector2i(x,y - 1),new kha_math_Vector2i(x + 1,y - 1),new kha_math_Vector2i(x - 1,y),new kha_math_Vector2i(x,y),new kha_math_Vector2i(x + 1,y),new kha_math_Vector2i(x - 1,y + 1),new kha_math_Vector2i(x,y + 1),new kha_math_Vector2i(x + 1,y + 1)];
+	}
+	,hitTest: function(x,y,t) {
+		if(this.Base.hitTest(x,y,t)) {
+			return true;
+		}
+		t.Y += this.BaseH;
+		var count = 2;
+		var _g1 = 0;
+		var _g = count;
+		while(_g1 < _g) {
+			var i = _g1++;
+			if(this.Stage.hitTest(x,y,t)) {
+				return true;
+			}
+			t.Y += this.StageH;
+		}
+		if(this.Roof.hitTest(x,y,t)) {
+			return true;
+		}
+		return false;
+	}
+	,draw: function(layer,render,t,state) {
+		this.Base.draw(layer,render,t);
+		t.Y += this.BaseH;
+		var count = 2;
+		var _g1 = 0;
+		var _g = count;
+		while(_g1 < _g) {
+			var i = _g1++;
+			this.Stage.draw(layer,render,t);
+			t.Y += this.StageH;
+		}
+		this.Roof.draw(layer,render,t);
+	}
+	,__class__: behaviors_buildings_BuildingResource
+};
+var behaviors_buildings_BuildingState = function() {
+};
+$hxClasses["behaviors.buildings.BuildingState"] = behaviors_buildings_BuildingState;
+behaviors_buildings_BuildingState.__name__ = ["behaviors","buildings","BuildingState"];
+behaviors_buildings_BuildingState.prototype = {
+	StagesCount: null
+	,Health: null
+	,Size: null
+	,BuildingType: null
+	,encode: function() {
+		return this.StagesCount + (this.Health << 4) + (this.Size << 8) + (this.BuildingType << 16);
+	}
+	,decode: function(value) {
+		this.StagesCount = value & 15;
+		this.Health = (value & 240) >> 4;
+		this.Size = (value & 3840) >> 8;
+		this.BuildingType = (value & -65536) >> 16;
+	}
+	,__class__: behaviors_buildings_BuildingState
+};
+var behaviors_buildings_Buildings = function(tiles,states,renderData,buildings,buildingsInstances) {
+	this._tiles = tiles;
+	this._renderData = renderData;
+	this._tileStates = states;
+	this._buildings = buildings;
+	this._state = new behaviors_buildings_BuildingState();
+	this._buildingsInstances = buildingsInstances;
+	this.spawnBuildings(1000);
+};
+$hxClasses["behaviors.buildings.Buildings"] = behaviors_buildings_Buildings;
+behaviors_buildings_Buildings.__name__ = ["behaviors","buildings","Buildings"];
+behaviors_buildings_Buildings.__interfaces__ = [engine_input_IMotionHandler,entities_IComponent];
+behaviors_buildings_Buildings.prototype = {
+	spawnBuilding: function(x,y,size,type) {
+		var building = this._buildings[type];
+		var tiles = building.getTiles(x,y,size);
+		if(!this._tileStates.validateTiles(tiles,0)) {
+			return null;
+		}
+		this._state.BuildingType = type;
+		this._state.StagesCount = Std.random(4);
+		var tmp = this._state.StagesCount;
+		var tmp1 = Std.random(3);
+		this._state.Health = tmp + tmp1;
+		this._state.Size = size;
+		var instance = new behaviors_buildings_BuildingInstance(x,y,this._state);
+		var id = this._buildingsInstances.length;
+		this._buildingsInstances[id] = instance;
+		this._tileStates.setTiles(tiles,id + 1);
+		utils_Statistics.Instance.reportBuildingsCount(this._buildingsInstances.length);
+		return instance;
+	}
+	,removeBuilding: function(instance) {
+		this._state.decode(instance.State);
+		var building = this._buildings[this._state.BuildingType];
+		var tiles = building.getTiles(instance.getX(),instance.getY(),this._state.Size);
+		this._tileStates.setTiles(tiles,0);
+		HxOverrides.remove(this._buildingsInstances,instance);
+		utils_Statistics.Instance.reportBuildingsCount(this._buildingsInstances.length);
+	}
+	,removeBuildings: function(count) {
+		var _g1 = 0;
+		var _g = count;
+		while(_g1 < _g) {
+			var i = _g1++;
+			if(this._buildingsInstances.length == 0) {
+				return;
+			}
+			var instance = this._buildingsInstances[this._buildingsInstances.length - 1];
+			this.removeBuilding(instance);
+		}
+	}
+	,spawnBuildings: function(count) {
+		var _g1 = 0;
+		var _g = count;
+		while(_g1 < _g) {
+			var i = _g1++;
+			var _g2 = 0;
+			while(_g2 < 50) {
+				var j = _g2++;
+				var rndX = Std.random(this._tileStates.SizeX);
+				var rndY = Std.random(this._tileStates.SizeY);
+				var type = Std.random(this._buildings.length);
+				var size = Std.random(3) + 1;
+				var result = this.spawnBuilding(rndX,rndY,size,type);
+				if(result != null) {
+					break;
+				}
+			}
+		}
+	}
+	,getSystemId: function() {
+		return entities_EntitySystem.SytemBehaviorId;
+	}
+	,load: function(e) {
+		e.Motions.addHandler(this);
+	}
+	,update: function(e) {
+		this._tiles.query(e.Frustum,this._renderData);
+	}
+	,proirity: function() {
+		return 0;
+	}
+	,motionStart: function(x,y) {
+		if(this._frustum == null) {
+			return engine_input_MotionHandleMode.None;
+		}
+		var t = engine_Transform.fromXY(0,0);
+		var removeList = new List();
+		var _g1 = 0;
+		var _g = this._renderData.Count;
+		while(_g1 < _g) {
+			var i = _g1++;
+			var d = this._renderData.Data[i];
+			var state = this._tileStates.get(d.X,d.Y);
+			if(state == 0) {
+				continue;
+			}
+			var buildingInstnce = this._buildingsInstances[state - 1];
+			this._state.decode(buildingInstnce.State);
+			t.X = d.RenderX - this._frustum.X;
+			t.Y = d.RenderY - this._frustum.Y;
+			var type = this._state.BuildingType;
+			if(this._buildings[type].hitTest(x,y,t)) {
+				removeList.add(buildingInstnce);
+			}
+		}
+		var _g_head = removeList.h;
+		while(_g_head != null) {
+			var val = _g_head.item;
+			_g_head = _g_head.next;
+			var i1 = val;
+			this.removeBuilding(i1);
+		}
+		return engine_input_MotionHandleMode.None;
+	}
+	,motionMove: function(x,y) {
+		return engine_input_MotionHandleMode.None;
+	}
+	,motionEnd: function(x,y) {
+	}
+	,_frustum: null
+	,_state: null
+	,_tiles: null
+	,_renderData: null
+	,_tileStates: null
+	,_gen: null
+	,_buildings: null
+	,_buildingsInstances: null
+	,__class__: behaviors_buildings_Buildings
+};
+var behaviors_buildings_BuildingsRender = function(layer,states,renderData,buildings,buildingsInstances) {
+	this.Layer = 0;
+	this.Layer = layer;
+	this._renderData = renderData;
+	this._tileStates = states;
+	this._buildings = buildings;
+	this._buildingsInstances = buildingsInstances;
+	this._buildingState = new behaviors_buildings_BuildingState();
+};
+$hxClasses["behaviors.buildings.BuildingsRender"] = behaviors_buildings_BuildingsRender;
+behaviors_buildings_BuildingsRender.__name__ = ["behaviors","buildings","BuildingsRender"];
+behaviors_buildings_BuildingsRender.__interfaces__ = [entities_IComponent];
+behaviors_buildings_BuildingsRender.prototype = {
+	Layer: null
+	,getSystemId: function() {
+		return entities_EntitySystem.SytemRenderId;
+	}
+	,load: function(e) {
+	}
+	,update: function(e) {
+		var t = engine_Transform.fromXY(0,0);
+		var _g1 = 0;
+		var _g = this._renderData.Count;
+		while(_g1 < _g) {
+			var i = _g1++;
+			var d = this._renderData.Data[i];
+			var state = this._tileStates.get(d.X,d.Y);
+			if(state == 0) {
+				continue;
+			}
+			var buildingInstnce = this._buildingsInstances[state - 1];
+			this._buildingState.decode(buildingInstnce.State);
+			t.X = d.RenderX;
+			t.Y = d.RenderY;
+			var type = this._buildingState.BuildingType;
+			this._buildings[type].draw(this.Layer,e.Render,t,this._buildingState);
+		}
+	}
+	,_renderData: null
+	,_tileStates: null
+	,_buildingsInstances: null
+	,_buildings: null
+	,_buildingState: null
+	,__class__: behaviors_buildings_BuildingsRender
+};
+var components_ComponentGuiRect = function(layer,aabb,image) {
+	this.Layer = 0;
+	this.Layer = layer;
+	this.Image = image;
+	this.Aabb = aabb;
+	this.Vertices = [aabb.minX(),aabb.minY(),0,1,aabb.minX(),aabb.maxY(),0,0,aabb.maxX(),aabb.maxY(),1,0,aabb.maxX(),aabb.minY(),1,1].slice(0);
+};
+$hxClasses["components.ComponentGuiRect"] = components_ComponentGuiRect;
+components_ComponentGuiRect.__name__ = ["components","ComponentGuiRect"];
+components_ComponentGuiRect.__interfaces__ = [entities_IComponent];
+components_ComponentGuiRect.prototype = {
+	Aabb: null
+	,Vertices: null
+	,Image: null
+	,Layer: null
+	,getSystemId: function() {
+		return entities_EntitySystem.SytemRenderId;
+	}
+	,load: function(e) {
+	}
+	,update: function(e) {
+		this.Image.drawQuad(this.Layer,e.Render,this.Vertices);
+	}
+	,__class__: components_ComponentGuiRect
 };
 var components_ComponentSprite = function(layer,image) {
 	this.Layer = 0;
@@ -755,8 +1232,9 @@ components_ComponentSprite.prototype = {
 	}
 	,__class__: components_ComponentSprite
 };
-var components_ComponentText = function(layer) {
+var components_ComponentText = function(layer,text) {
 	this.Layer = layer;
+	this.Text = text;
 };
 $hxClasses["components.ComponentText"] = components_ComponentText;
 components_ComponentText.__name__ = ["components","ComponentText"];
@@ -778,39 +1256,28 @@ components_ComponentText.prototype = {
 	}
 	,__class__: components_ComponentText
 };
-var components_ComponentTileMap = function(layer,tiles,palette) {
+var components_ComponentTilesRender = function(layer,tiles,renderData) {
 	this.Layer = 0;
 	this.Layer = layer;
-	var transform = new kha_math_FastMatrix2(64,-64,-32,-32);
-	this.TileMap = new engine_tilemap_TileMap(tiles,transform);
-	var this1 = new Array(16384);
-	this._renderTiles = this1;
-	var _g1 = 0;
-	var _g = this._renderTiles.length;
-	while(_g1 < _g) {
-		var i = _g1++;
-		this._renderTiles[i] = new engine_tilemap_TileInfo();
-	}
-	this.Palette = palette;
+	this.TileMap = tiles;
+	this.RenderData = renderData;
 };
-$hxClasses["components.ComponentTileMap"] = components_ComponentTileMap;
-components_ComponentTileMap.__name__ = ["components","ComponentTileMap"];
-components_ComponentTileMap.__interfaces__ = [entities_IComponent];
-components_ComponentTileMap.prototype = {
+$hxClasses["components.ComponentTilesRender"] = components_ComponentTilesRender;
+components_ComponentTilesRender.__name__ = ["components","ComponentTilesRender"];
+components_ComponentTilesRender.__interfaces__ = [entities_IComponent];
+components_ComponentTilesRender.prototype = {
 	Layer: null
 	,TileMap: null
-	,Palette: null
+	,RenderData: null
 	,getSystemId: function() {
 		return entities_EntitySystem.SytemRenderId;
 	}
 	,load: function(e) {
 	}
 	,update: function(e) {
-		var count = this.TileMap.query(e.Frustum,this._renderTiles);
-		this.TileMap.renderTiles(e.Frustum,e.Render,this._renderTiles,count,this.Palette);
+		this.TileMap.renderTiles(this.Layer,e.Render,this.RenderData);
 	}
-	,_renderTiles: null
-	,__class__: components_ComponentTileMap
+	,__class__: components_ComponentTilesRender
 };
 var components_ComponentTransform = function(value) {
 	this.Value = value;
@@ -959,6 +1426,15 @@ engine_Transform.prototype = {
 	}
 	,__class__: engine_Transform
 };
+var engine_Viewport = function() {
+};
+$hxClasses["engine.Viewport"] = engine_Viewport;
+engine_Viewport.__name__ = ["engine","Viewport"];
+engine_Viewport.prototype = {
+	Width: null
+	,Height: null
+	,__class__: engine_Viewport
+};
 var engine_input_MotionHandleMode = $hxClasses["engine.input.MotionHandleMode"] = { __ename__ : true, __constructs__ : ["None","Joint","Handled"] };
 engine_input_MotionHandleMode.None = ["None",0];
 engine_input_MotionHandleMode.None.toString = $estr;
@@ -1013,38 +1489,31 @@ engine_input_MotionsManager.prototype = {
 	,reportMotion: function(type,id,x,y) {
 		this._motions.add(new engine_input_MotionInfo(type,id,x,y));
 	}
-	,update: function() {
+	,update: function(e) {
+		var sx = e.Viewport.Width / 2 | 0;
+		var sy = e.Viewport.Height / 2 | 0;
 		var _g_head = this._motions.h;
 		while(_g_head != null) {
 			var val = _g_head.item;
 			_g_head = _g_head.next;
 			var m = val;
+			var x = m.X - sx;
+			var y = sy - m.Y;
 			var _g = 0;
 			var _g1 = this._handlers;
-			try {
-				while(_g < _g1.length) {
-					var h = _g1[_g];
-					++_g;
-					var _g2 = m.Motion;
-					switch(_g2[1]) {
-					case 0:
-						throw "__break__";
-						break;
-					case 1:
-						h.motionStart(m.X,m.Y);
-						throw "__break__";
-						break;
-					case 2:
-						h.motionEnd(m.X,m.Y);
-						throw "__break__";
-						break;
-					case 3:
-						h.motionMove(m.X,m.Y);
-						throw "__break__";
-						break;
-					}
+			while(_g < _g1.length) {
+				var h = _g1[_g];
+				++_g;
+				if(m.Motion == engine_input_MotionType.Start) {
+					h.motionStart(x,y);
 				}
-			} catch( e ) { if( e != "__break__" ) throw e; }
+				if(m.Motion == engine_input_MotionType.Move) {
+					h.motionMove(x,y);
+				}
+				if(m.Motion == engine_input_MotionType.End) {
+					h.motionEnd(x,y);
+				}
+			}
 		}
 		this._motions.clear();
 	}
@@ -1210,8 +1679,8 @@ engine_render_RenderLayer.prototype = {
 };
 var engine_render_RenderService = function() {
 	this._layersLimit = 10;
-	this._iLimit = 65536;
-	this._vLimit = 65536;
+	this._iLimit = 262144;
+	this._vLimit = 262144;
 	var structure = new kha_graphics4_VertexStructure();
 	structure.add("xy",kha_graphics4_VertexData.Float2);
 	structure.add("uv",kha_graphics4_VertexData.Float2);
@@ -1501,15 +1970,27 @@ engine_resources_ResourceFont.prototype = {
 	,Kernings: null
 	,LineHeight: null
 	,LineBase: null
-	,draw: function(layer,render,transform,text) {
+	,getSize: function(text) {
 		var i = 0;
 		var x = 0;
+		while(i < text.length) {
+			var ch = HxOverrides.cca(text,i);
+			var glyph = this.Glyphs.h[ch];
+			x += glyph.XAdvance;
+			++i;
+		}
+		return x;
+	}
+	,draw: function(layer,render,transform,text) {
+		var y = -(this.LineBase - (this.LineHeight - this.LineBase)) * 0.5 * transform.ScaleY;
+		var x = -this.getSize(text) * 0.5 * transform.ScaleX;
 		var t = transform.clone();
+		var i = 0;
 		while(i < text.length) {
 			var ch = HxOverrides.cca(text,i);
 			var glyph = this.Glyphs.h[ch];
 			t.X = transform.X + x + glyph.RenderXOffset * t.ScaleX;
-			t.Y = transform.Y + glyph.RenderYOffset * t.ScaleY;
+			t.Y = transform.Y + y + glyph.RenderYOffset * t.ScaleY;
 			glyph.Texture.draw(layer,render,t);
 			x += glyph.XAdvance * t.ScaleX;
 			++i;
@@ -1552,15 +2033,26 @@ engine_resources_ResourceImage.prototype = {
 	Vertices: null
 	,Indices: null
 	,Texture: null
+	,hitTest: function(x,y,transform) {
+		var sx = this.Texture.get_width() * transform.ScaleX / 2;
+		var sy = this.Texture.get_height() * transform.ScaleX / 2;
+		var tx = x - transform.X;
+		var ty = y - transform.Y;
+		if(-sx <= tx && tx <= sx && -sy <= ty) {
+			return ty <= sy;
+		} else {
+			return false;
+		}
+	}
 	,createSubImage: function(x,y,w,h) {
 		var result = new engine_resources_ResourceImage();
 		result.Texture = this.Texture;
 		var sx = w / 2;
 		var sy = h / 2;
-		var tx0 = x / (this.Texture.get_width() - 1);
-		var ty0 = y / (this.Texture.get_height() - 1);
-		var tx1 = (x + w - 1) / (this.Texture.get_width() - 1);
-		var ty1 = (y + h - 1) / (this.Texture.get_height() - 1);
+		var tx0 = x / this.Texture.get_width();
+		var ty0 = y / this.Texture.get_height();
+		var tx1 = (x + w) / this.Texture.get_width();
+		var ty1 = (y + h) / this.Texture.get_height();
 		result.Vertices = [-sx,-sy,tx0,ty1,-sx,sy,tx0,ty0,sx,sy,tx1,ty0,sx,-sy,tx1,ty1].slice(0);
 		result.Indices = engine_resources_ResourceImage.QuadIndices;
 		return result;
@@ -1600,57 +2092,35 @@ engine_resources_ResourceImage.prototype = {
 	,draw: function(layer,render,transform) {
 		render.drawImage(layer,this.Texture,this.Vertices,this.Indices,transform);
 	}
+	,drawQuad: function(layer,render,vertices) {
+		render.drawImage(layer,this.Texture,vertices,engine_resources_ResourceImage.QuadIndices,engine_Transform.empty);
+	}
 	,__class__: engine_resources_ResourceImage
 };
 var engine_resources_ResourceTileMap = function() {
+	this.Data = new engine_tilemap_TileStruct();
 };
 $hxClasses["engine.resources.ResourceTileMap"] = engine_resources_ResourceTileMap;
 engine_resources_ResourceTileMap.__name__ = ["engine","resources","ResourceTileMap"];
-engine_resources_ResourceTileMap.fromValue = function(sizeX,sizeY,value) {
-	var result = new engine_resources_ResourceTileMap();
-	result.SizeX = sizeX;
-	result.SizeY = sizeY;
-	var this1 = new Array(sizeX * sizeY);
-	result.Map = this1;
-	var _g1 = 0;
-	var _g = result.Map.length;
-	while(_g1 < _g) {
-		var i = _g1++;
-		result.Map[i] = value;
-	}
-	return result;
-};
 engine_resources_ResourceTileMap.fromBlob = function(jsonData) {
 	var jsonTiles = JSON.parse(jsonData.toString());
 	var layer = jsonTiles.layers[0];
 	var result = new engine_resources_ResourceTileMap();
-	result.SizeX = layer.width;
-	result.SizeY = layer.height;
+	result.Data.SizeX = layer.width;
+	result.Data.SizeY = layer.height;
 	var length = layer.data.length;
 	var this1 = new Array(length);
-	result.Map = this1;
+	result.Data.Map = this1;
 	var _g1 = 0;
-	var _g = result.Map.length;
+	var _g = result.Data.Map.length;
 	while(_g1 < _g) {
 		var i = _g1++;
-		result.Map[i] = layer.data[i] - 1;
+		result.Data.Map[i] = layer.data[i] - 1;
 	}
 	return result;
 };
 engine_resources_ResourceTileMap.prototype = {
-	SizeX: null
-	,SizeY: null
-	,Map: null
-	,get: function(x,y) {
-		var rx = engine_MathHelpers.range(x,this.SizeX);
-		var ry = engine_MathHelpers.range(y,this.SizeY);
-		return this.Map[ry * this.SizeX + rx];
-	}
-	,set: function(x,y,value) {
-		var rx = engine_MathHelpers.range(x,this.SizeX);
-		var ry = engine_MathHelpers.range(y,this.SizeY);
-		this.Map[ry * this.SizeX + rx] = value;
-	}
+	Data: null
 	,__class__: engine_resources_ResourceTileMap
 };
 var engine_resources_JsonTilesLayer = function() { };
@@ -1691,16 +2161,53 @@ engine_tilemap_TileInfo.prototype = {
 	,Value: null
 	,__class__: engine_tilemap_TileInfo
 };
-var engine_tilemap_TileMap = function(tiles,transform) {
+var engine_tilemap_TileInfos = function(caheSize) {
+	var this1 = new Array(caheSize);
+	this.Data = this1;
+	this.Count = 0;
+	var _g1 = 0;
+	var _g = this.Data.length;
+	while(_g1 < _g) {
+		var i = _g1++;
+		this.Data[i] = new engine_tilemap_TileInfo();
+	}
+};
+$hxClasses["engine.tilemap.TileInfos"] = engine_tilemap_TileInfos;
+engine_tilemap_TileInfos.__name__ = ["engine","tilemap","TileInfos"];
+engine_tilemap_TileInfos.prototype = {
+	Data: null
+	,Count: null
+	,clear: function() {
+		this.Count = 0;
+	}
+	,add: function(x,y,rx,ry,value) {
+		if(this.Count >= this.Data.length) {
+			return false;
+		}
+		var info = this.Data[this.Count];
+		info.X = x;
+		info.Y = y;
+		info.RenderX = rx;
+		info.RenderY = ry;
+		info.Value = value;
+		this.Count++;
+		return true;
+	}
+	,__class__: engine_tilemap_TileInfos
+};
+var engine_tilemap_TileMap = function(tiles,transform,palette) {
 	this.Tiles = tiles;
 	this.Axis = transform;
+	this.Palette = palette;
 };
 $hxClasses["engine.tilemap.TileMap"] = engine_tilemap_TileMap;
 engine_tilemap_TileMap.__name__ = ["engine","tilemap","TileMap"];
 engine_tilemap_TileMap.prototype = {
 	Tiles: null
 	,Axis: null
+	,Palette: null
 	,query: function(frustum,resultTiles) {
+		resultTiles.clear();
 		var inverse = engine_MathHelpers.inverseMatrix2(this.Axis);
 		var value_y;
 		var value_x = frustum.X - frustum.Sx;
@@ -1740,7 +2247,7 @@ engine_tilemap_TileMap.prototype = {
 			var y4 = posY;
 			while(y4 >= minY && x4 <= maxX) {
 				if(!walker.Walk(x4,y4)) {
-					return resultTiles.length;
+					return;
 				}
 				++x4;
 				--y4;
@@ -1753,29 +2260,28 @@ engine_tilemap_TileMap.prototype = {
 			var y5 = maxY;
 			while(y5 >= minY && x5 <= maxX) {
 				if(!walker.Walk(x5,y5)) {
-					return resultTiles.length;
+					return;
 				}
 				++x5;
 				--y5;
 			}
 			++posX;
 		}
-		return walker.Index;
 	}
-	,renderTiles: function(frustum,render,resultTiles,count,palette) {
+	,renderTiles: function(layer,render,resultTiles) {
 		var t = engine_Transform.fromXY(0,0);
 		var _g1 = 0;
-		var _g = count;
+		var _g = resultTiles.Count;
 		while(_g1 < _g) {
 			var i = _g1++;
-			var tile = resultTiles[i];
+			var tile = resultTiles.Data[i];
 			t.X = tile.RenderX;
 			t.Y = tile.RenderY;
-			var image = palette.Data[tile.Value];
+			var image = this.Palette.Data[tile.Value];
 			if(image == null) {
 				continue;
 			}
-			image.draw(engine_render_RenderLayer.GameLayer0,render,t);
+			image.draw(layer,render,t);
 		}
 	}
 	,__class__: engine_tilemap_TileMap
@@ -1798,9 +2304,6 @@ engine_tilemap_TilesWalker.prototype = {
 	,Tiles: null
 	,p: null
 	,Walk: function(x,y) {
-		if(this.Index >= this.ResultTiles.length) {
-			return false;
-		}
 		this.p.x = x;
 		this.p.y = y;
 		var ps_y;
@@ -1814,16 +2317,75 @@ engine_tilemap_TilesWalker.prototype = {
 		if(!this.Frustum.include(ps_x,ps_y)) {
 			return true;
 		}
-		var tile = this.ResultTiles[this.Index];
-		tile.X = x;
-		tile.Y = y;
-		tile.RenderX = ps_x;
-		tile.RenderY = ps_y;
-		tile.Value = this.Tiles.get(x,y);
-		this.Index++;
-		return true;
+		return this.ResultTiles.add(x,y,ps_x,ps_y,this.Tiles.get(x,y));
 	}
 	,__class__: engine_tilemap_TilesWalker
+};
+var engine_tilemap_TileStruct = function() {
+};
+$hxClasses["engine.tilemap.TileStruct"] = engine_tilemap_TileStruct;
+engine_tilemap_TileStruct.__name__ = ["engine","tilemap","TileStruct"];
+engine_tilemap_TileStruct.fromValue = function(sizeX,sizeY,value) {
+	var result = new engine_tilemap_TileStruct();
+	result.SizeX = sizeX;
+	result.SizeY = sizeY;
+	var this1 = new Array(sizeX * sizeY);
+	result.Map = this1;
+	var _g1 = 0;
+	var _g = result.Map.length;
+	while(_g1 < _g) {
+		var i = _g1++;
+		result.Map[i] = value;
+	}
+	return result;
+};
+engine_tilemap_TileStruct.prototype = {
+	SizeX: null
+	,SizeY: null
+	,Map: null
+	,validateTiles: function(tiles,value) {
+		var _g = 0;
+		while(_g < tiles.length) {
+			var v = tiles[_g];
+			++_g;
+			if(v.x < 0) {
+				return false;
+			}
+			if(v.y < 0) {
+				return false;
+			}
+			if(v.x >= this.SizeX) {
+				return false;
+			}
+			if(v.y >= this.SizeX) {
+				return false;
+			}
+			if(this.get(v.x,v.y) != value) {
+				return false;
+			}
+		}
+		return true;
+	}
+	,setTiles: function(tiles,value) {
+		var _g = 0;
+		while(_g < tiles.length) {
+			var v = tiles[_g];
+			++_g;
+			this.set(v.x,v.y,value);
+		}
+	}
+	,getAddress: function(x,y) {
+		var rx = engine_MathHelpers.range(x,this.SizeX);
+		var ry = engine_MathHelpers.range(y,this.SizeY);
+		return ry * this.SizeX + rx;
+	}
+	,get: function(x,y) {
+		return this.Map[this.getAddress(x,y)];
+	}
+	,set: function(x,y,value) {
+		this.Map[this.getAddress(x,y)] = value;
+	}
+	,__class__: engine_tilemap_TileStruct
 };
 var engine_tilemap_TilesPalette = function(name,ext,atlas) {
 	var data = [];
@@ -2002,11 +2564,13 @@ var entities_UpdateContext = function(render,motions,ellapsetTime) {
 	this.Render = render;
 	this.EllapsetTime = ellapsetTime;
 	this.Frustum = engine_Aabb.fromXY(0,0);
+	this.Viewport = new engine_Viewport();
 };
 $hxClasses["entities.UpdateContext"] = entities_UpdateContext;
 entities_UpdateContext.__name__ = ["entities","UpdateContext"];
 entities_UpdateContext.prototype = {
-	Frustum: null
+	Viewport: null
+	,Frustum: null
 	,Render: null
 	,EllapsetTime: null
 	,Motions: null
@@ -4006,7 +4570,13 @@ js_html_compat_Uint8Array._subarray = function(start,end) {
 	return a;
 };
 var kha__$Assets_ImageList = function() {
-	this.names = ["all_scene_images","calibri_0"];
+	this.names = ["all_scene_images","calibri_0","red_button","green_button1"];
+	this.green_button1Description = { files : ["green_button1.png"], original_height : 120, type : "image", original_width : 120, name : "green_button1"};
+	this.green_button1Name = "green_button1";
+	this.green_button1 = null;
+	this.red_buttonDescription = { files : ["red_button.png"], original_height : 120, type : "image", original_width : 120, name : "red_button"};
+	this.red_buttonName = "red_button";
+	this.red_button = null;
 	this.calibri_0Description = { files : ["calibri_0.png"], original_height : 512, type : "image", original_width : 512, name : "calibri_0"};
 	this.calibri_0Name = "calibri_0";
 	this.calibri_0 = null;
@@ -4041,6 +4611,30 @@ kha__$Assets_ImageList.prototype = {
 		this.calibri_0.unload();
 		this.calibri_0 = null;
 	}
+	,red_button: null
+	,red_buttonName: null
+	,red_buttonDescription: null
+	,red_buttonLoad: function(done) {
+		kha_Assets.loadImage("red_button",function(image) {
+			done();
+		});
+	}
+	,red_buttonUnload: function() {
+		this.red_button.unload();
+		this.red_button = null;
+	}
+	,green_button1: null
+	,green_button1Name: null
+	,green_button1Description: null
+	,green_button1Load: function(done) {
+		kha_Assets.loadImage("green_button1",function(image) {
+			done();
+		});
+	}
+	,green_button1Unload: function() {
+		this.green_button1.unload();
+		this.green_button1 = null;
+	}
 	,names: null
 	,__class__: kha__$Assets_ImageList
 };
@@ -4054,13 +4648,16 @@ kha__$Assets_SoundList.prototype = {
 	,__class__: kha__$Assets_SoundList
 };
 var kha__$Assets_BlobList = function() {
-	this.names = ["all_scene_images_json","calibri_fnt","tiles_json"];
+	this.names = ["all_scene_images_json","buildings_json","calibri_fnt","tiles_json"];
 	this.tiles_jsonDescription = { files : ["tiles.json"], type : "blob", name : "tiles_json"};
 	this.tiles_jsonName = "tiles_json";
 	this.tiles_json = null;
 	this.calibri_fntDescription = { files : ["calibri.fnt"], type : "blob", name : "calibri_fnt"};
 	this.calibri_fntName = "calibri_fnt";
 	this.calibri_fnt = null;
+	this.buildings_jsonDescription = { files : ["buildings.json"], type : "blob", name : "buildings_json"};
+	this.buildings_jsonName = "buildings_json";
+	this.buildings_json = null;
 	this.all_scene_images_jsonDescription = { files : ["all_scene_images.json"], type : "blob", name : "all_scene_images_json"};
 	this.all_scene_images_jsonName = "all_scene_images_json";
 	this.all_scene_images_json = null;
@@ -4079,6 +4676,18 @@ kha__$Assets_BlobList.prototype = {
 	,all_scene_images_jsonUnload: function() {
 		this.all_scene_images_json.unload();
 		this.all_scene_images_json = null;
+	}
+	,buildings_json: null
+	,buildings_jsonName: null
+	,buildings_jsonDescription: null
+	,buildings_jsonLoad: function(done) {
+		kha_Assets.loadBlob("buildings_json",function(blob) {
+			done();
+		});
+	}
+	,buildings_jsonUnload: function() {
+		this.buildings_json.unload();
+		this.buildings_json = null;
 	}
 	,calibri_fnt: null
 	,calibri_fntName: null
@@ -25158,12 +25767,14 @@ var utils_Statistics = function() {
 	this._lastTime = -1;
 	this.LastFpsPerSecond = 0;
 	this.LastRenderDelay = 0;
+	this.BuildingsCount = 0;
 	this.LastFps = 0;
 };
 $hxClasses["utils.Statistics"] = utils_Statistics;
 utils_Statistics.__name__ = ["utils","Statistics"];
 utils_Statistics.prototype = {
 	LastFps: null
+	,BuildingsCount: null
 	,LastRenderDelay: null
 	,LastFpsPerSecond: null
 	,reportRenderFrame: function(realTime) {
@@ -25179,6 +25790,9 @@ utils_Statistics.prototype = {
 			this._framesCount = 0;
 			this._perSecondTime = 0;
 		}
+	}
+	,reportBuildingsCount: function(count) {
+		this.BuildingsCount = count;
 	}
 	,_lastTime: null
 	,_perSecondTime: null
@@ -25220,6 +25834,7 @@ Xml.ProcessingInstruction = 5;
 Xml.Document = 6;
 engine_MathHelpers.MaxFloat = 1e20;
 engine_MathHelpers.MinFloat = -1e20;
+engine_Transform.empty = new engine_Transform(0,0,1,1);
 engine_render_RenderLayer.GameLayer0 = 0;
 engine_render_RenderLayer.GameLayer1 = 1;
 engine_render_RenderLayer.GuiLayer = 2;

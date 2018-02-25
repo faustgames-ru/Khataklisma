@@ -27,7 +27,8 @@ class FpsCounter implements IComponent
 	public function update(e: UpdateContext): Void
 	{
 		var fps =Std.int(Statistics.Instance.LastFpsPerSecond);
-		_text.Text = 'fps: $fps';
+		var buildings =Std.int(Statistics.Instance.BuildingsCount);
+		_text.Text = 'fps: $fps buildings: $buildings';
 	}
 
 	private var _text: ComponentText;

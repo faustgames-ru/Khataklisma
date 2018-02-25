@@ -15,8 +15,8 @@ class Camera implements IComponent implements IMotionHandler
 {	
 	public function new ()
 	{		
-		_cameraX = 0;
-		_cameraY = 0;
+		_cameraX = _cameraTargetX = 0;
+		_cameraY = _cameraTargetY = 3000;
 		_moveHistory = new Vector<MoveHistory>(5);
 		for (i in 0..._moveHistory.length)
 		{
@@ -44,8 +44,12 @@ class Camera implements IComponent implements IMotionHandler
 		_cameraX = MathHelpers.lerp(_cameraX, _cameraTargetX, MathHelpers.saturate(e.EllapsetTime*4));
 		_cameraY = MathHelpers.lerp(_cameraY, _cameraTargetY, MathHelpers.saturate(e.EllapsetTime*4));
 		updateHistory(_cameraX, _cameraY);
-		e.Frustum = Aabb.fromXYSize(-_cameraX, -_cameraY, 512+128, 384+96); // todo: remove magic nubmers
-		e.Render.setTransform(0, FastMatrix4.translation(_cameraX, _cameraY, 0));
+		var w= e.Viewport.Width*0.5;
+		var h= e.Viewport.Height*0.5;
+		e.Frustum = Aabb.fromXYSize(-_cameraX, -_cameraY - 96, w+128, h+128); // todo: remove magic nubmers
+		var transform =FastMatrix4.translation(_cameraX, _cameraY, 0);
+		e.Render.setTransform(0, transform);
+		e.Render.setTransform(1, transform);
 	}
 	
 	public function proirity(): Int
@@ -66,7 +70,7 @@ class Camera implements IComponent implements IMotionHandler
 	public function motionMove(x: Int, y: Int): MotionHandleMode
 	{
 		_cameraTargetX = _cameraX = _touchCameraX + x - _touchX;
-		_cameraTargetY = _cameraY = _touchCameraY - y + _touchY;		
+		_cameraTargetY = _cameraY = _touchCameraY + y - _touchY;		
 		return MotionHandleMode.Joint;
 	}
 	public function motionEnd(x: Int, y: Int): Void

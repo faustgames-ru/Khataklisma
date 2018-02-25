@@ -37,17 +37,28 @@ EReg.prototype = {
 var EntityFactory = function() { };
 $hxClasses["EntityFactory"] = EntityFactory;
 EntityFactory.__name__ = ["EntityFactory"];
-EntityFactory.tilemap = function(tiles,atlas) {
-	return new entities_Entity([new components_ComponentTileMap(engine_render_RenderLayer.GameLayer0,tiles,atlas)]);
+EntityFactory.tilemap = function(tiles,palette,buildings) {
+	var transform = new kha_math_FastMatrix2(64,-64,-32,-32);
+	var tilesMap = new engine_tilemap_TileMap(tiles,transform,palette);
+	var tilesRender = new engine_tilemap_TileInfos(16384);
+	var buildingsStates = engine_tilemap_TileStruct.fromValue(tiles.SizeX,tiles.SizeY,0);
+	var buildingsInstances = [];
+	return new entities_Entity([new behaviors_buildings_Buildings(tilesMap,buildingsStates,tilesRender,buildings,buildingsInstances),new components_ComponentTilesRender(engine_render_RenderLayer.GameLayer0,tilesMap,tilesRender),new behaviors_buildings_BuildingsRender(engine_render_RenderLayer.GameLayer1,buildingsStates,tilesRender,buildings,buildingsInstances)]);
 };
 EntityFactory.sprite = function(layer,x,y,image) {
 	return new entities_Entity([new components_ComponentTransform(engine_Transform.fromXY(x,y)),new components_ComponentSprite(layer,image)]);
 };
+EntityFactory.guiPanel = function(aabb,image) {
+	return new entities_Entity([new components_ComponentGuiRect(engine_render_RenderLayer.GuiLayer,aabb,image)]);
+};
 EntityFactory.camera = function() {
 	return new entities_Entity([new behaviors_Camera()]);
 };
+EntityFactory.addButton = function(x,y,image,title,buildings,count) {
+	return new entities_Entity([new components_ComponentTransform(engine_Transform.fromXYScale(x,y,0.7,0.7)),new components_ComponentSprite(engine_render_RenderLayer.GuiLayer,image),new components_ComponentText(engine_render_RenderLayer.GuiLayer,title),new behaviors_AddButton(buildings,count)]);
+};
 EntityFactory.fpsCounter = function(x,y) {
-	return new entities_Entity([new components_ComponentTransform(engine_Transform.fromXY(x,y)),new components_ComponentText(engine_render_RenderLayer.GuiLayer),new behaviors_FpsCounter()]);
+	return new entities_Entity([new components_ComponentTransform(engine_Transform.fromXYScale(x,y,1.0,1.0)),new components_ComponentText(engine_render_RenderLayer.GuiLayer,"fps:"),new behaviors_FpsCounter()]);
 };
 var HxOverrides = function() { };
 $hxClasses["HxOverrides"] = HxOverrides;
@@ -272,12 +283,28 @@ Project.prototype = {
 		this._resources.DefaultFont = engine_resources_ResourceFont.fromBlob(kha_Assets.blobs.calibri_fnt,kha_Assets.images.calibri_0);
 		this._resources.DefaultAtlas = engine_resources_ResourceAtlas.fromBlob(kha_Assets.blobs.all_scene_images_json,kha_Assets.images.all_scene_images);
 		this._resources.DefaultTiles = engine_resources_ResourceTileMap.fromBlob(kha_Assets.blobs.tiles_json);
+		var redButtonSprite = engine_resources_ResourceImage.fromImage(kha_Assets.images.red_button);
+		var greenButtonSprite = engine_resources_ResourceImage.fromImage(kha_Assets.images.green_button1);
+		var palette = new engine_tilemap_TilesPalette("landscapeTiles_",".png",this._resources.DefaultAtlas);
+		var gen = this.createBuildingsGen();
+		var buildings = gen.genAll();
 		this._world = new entities_EntityWorld(new entities_LoadContext(this._resources,this._motions));
 		this._world.addEntity(EntityFactory.camera());
-		var _this = this._resources.DefaultAtlas.Frames;
-		var defaultTilesImage = __map_reserved["buildingTiles_000.png"] != null ? _this.getReserved("buildingTiles_000.png") : _this.h["buildingTiles_000.png"];
-		this._world.addEntity(EntityFactory.tilemap(this._resources.DefaultTiles,this._resources.DefaultAtlas));
-		this._world.addEntity(EntityFactory.fpsCounter(-502,-370));
+		var tileMap = EntityFactory.tilemap(this._resources.DefaultTiles.Data,palette,buildings);
+		var buildings1 = tileMap.get(behaviors_buildings_Buildings);
+		this._world.addEntity(tileMap);
+		this._world.addEntity(EntityFactory.addButton(-450,-300,redButtonSprite,"-1000",buildings1,-1000));
+		this._world.addEntity(EntityFactory.addButton(-450,-200,redButtonSprite,"-100",buildings1,-100));
+		this._world.addEntity(EntityFactory.addButton(-450,-100,redButtonSprite,"-1",buildings1,-100));
+		this._world.addEntity(EntityFactory.addButton(450,-300,greenButtonSprite,"+1000",buildings1,1000));
+		this._world.addEntity(EntityFactory.addButton(450,-200,greenButtonSprite,"+100",buildings1,100));
+		this._world.addEntity(EntityFactory.addButton(450,-100,greenButtonSprite,"+1",buildings1,100));
+		this._world.addEntity(EntityFactory.fpsCounter(0,350));
+	}
+	,createBuildingsGen: function() {
+		var config = JSON.parse(kha_Assets.blobs.buildings_json.toString());
+		var gen = new behaviors_buildings_BuildingGen(this._resources.DefaultAtlas,config);
+		return gen;
 	}
 	,update: function() {
 		this.updateInternal();
@@ -286,11 +313,13 @@ Project.prototype = {
 		if(this._world == null) {
 			return;
 		}
-		this._motions.update();
+		this._motions.update(this._updateContext);
 		this._world.update(this._updateContext);
 	}
 	,render: function(framebuffer) {
 		utils_Statistics.Instance.reportRenderFrame(kha_Scheduler.realTime());
+		this._updateContext.Viewport.Width = framebuffer.get_width();
+		this._updateContext.Viewport.Height = framebuffer.get_height();
 		this._render.apply(framebuffer);
 	}
 	,_render: null
@@ -334,6 +363,13 @@ Std.parseInt = function(x) {
 		return null;
 	}
 	return v;
+};
+Std.random = function(x) {
+	if(x <= 0) {
+		return 0;
+	} else {
+		return Math.floor(Math.random() * x);
+	}
 };
 var StringBuf = function() {
 	this.b = "";
@@ -611,9 +647,50 @@ entities_IComponent.prototype = {
 	,update: null
 	,__class__: entities_IComponent
 };
+var behaviors_AddButton = function(buildings,count) {
+	this.Buildings = buildings;
+	this.Count = count;
+};
+$hxClasses["behaviors.AddButton"] = behaviors_AddButton;
+behaviors_AddButton.__name__ = ["behaviors","AddButton"];
+behaviors_AddButton.__interfaces__ = [engine_input_IMotionHandler,entities_IComponent];
+behaviors_AddButton.prototype = {
+	Transform: null
+	,Sprite: null
+	,Buildings: null
+	,Count: null
+	,getSystemId: function() {
+		return entities_EntitySystem.SytemBehaviorId;
+	}
+	,load: function(e) {
+		e.Motions.addHandler(this);
+		this.Transform = e.Owner.get(components_ComponentTransform);
+		this.Sprite = e.Owner.get(components_ComponentSprite);
+	}
+	,update: function(e) {
+	}
+	,proirity: function() {
+		return 0;
+	}
+	,motionStart: function(x,y) {
+		if(this.Sprite.Image.hitTest(x,y,this.Transform.Value)) {
+			if(this.Count > 0) {
+				this.Buildings.spawnBuildings(this.Count);
+			}
+			return engine_input_MotionHandleMode.Handled;
+		}
+		return engine_input_MotionHandleMode.None;
+	}
+	,motionMove: function(x,y) {
+		return engine_input_MotionHandleMode.Joint;
+	}
+	,motionEnd: function(x,y) {
+	}
+	,__class__: behaviors_AddButton
+};
 var behaviors_Camera = function() {
-	this._cameraX = 0;
-	this._cameraY = 0;
+	this._cameraX = this._cameraTargetX = 0;
+	this._cameraY = this._cameraTargetY = 3000;
 	var this1 = new Array(5);
 	this._moveHistory = this1;
 	var _g1 = 0;
@@ -641,8 +718,10 @@ behaviors_Camera.prototype = {
 		this._cameraX = engine_MathHelpers.lerp(this._cameraX,this._cameraTargetX,engine_MathHelpers.saturate(e.EllapsetTime * 4));
 		this._cameraY = engine_MathHelpers.lerp(this._cameraY,this._cameraTargetY,engine_MathHelpers.saturate(e.EllapsetTime * 4));
 		this.updateHistory(this._cameraX,this._cameraY);
-		e.Frustum = engine_Aabb.fromXYSize(-this._cameraX,-this._cameraY,640,480);
-		e.Render.setTransform(0,new kha_math_FastMatrix4(1,0,0,this._cameraX,0,1,0,this._cameraY,0,0,1,0,0,0,0,1));
+		e.Frustum = engine_Aabb.fromXYSize(-this._cameraX,-this._cameraY - 96,640,512);
+		var transform = new kha_math_FastMatrix4(1,0,0,this._cameraX,0,1,0,this._cameraY,0,0,1,0,0,0,0,1);
+		e.Render.setTransform(0,transform);
+		e.Render.setTransform(1,transform);
 	}
 	,proirity: function() {
 		return 0;
@@ -657,7 +736,7 @@ behaviors_Camera.prototype = {
 	}
 	,motionMove: function(x,y) {
 		this._cameraTargetX = this._cameraX = this._touchCameraX + x - this._touchX;
-		this._cameraTargetY = this._cameraY = this._touchCameraY - y + this._touchY;
+		this._cameraTargetY = this._cameraY = this._touchCameraY + y - this._touchY;
 		return engine_input_MotionHandleMode.Joint;
 	}
 	,motionEnd: function(x,y) {
@@ -728,10 +807,321 @@ behaviors_FpsCounter.prototype = {
 	}
 	,update: function(e) {
 		var fps = utils_Statistics.Instance.LastFpsPerSecond | 0;
-		this._text.Text = "fps: " + fps;
+		var buildings = utils_Statistics.Instance.BuildingsCount | 0;
+		this._text.Text = "fps: " + fps + " buildings: " + buildings;
 	}
 	,_text: null
 	,__class__: behaviors_FpsCounter
+};
+var behaviors_buildings_BuildingDirection = $hxClasses["behaviors.buildings.BuildingDirection"] = { __ename__ : true, __constructs__ : ["N","S","E","W"] };
+behaviors_buildings_BuildingDirection.N = ["N",0];
+behaviors_buildings_BuildingDirection.N.toString = $estr;
+behaviors_buildings_BuildingDirection.N.__enum__ = behaviors_buildings_BuildingDirection;
+behaviors_buildings_BuildingDirection.S = ["S",1];
+behaviors_buildings_BuildingDirection.S.toString = $estr;
+behaviors_buildings_BuildingDirection.S.__enum__ = behaviors_buildings_BuildingDirection;
+behaviors_buildings_BuildingDirection.E = ["E",2];
+behaviors_buildings_BuildingDirection.E.toString = $estr;
+behaviors_buildings_BuildingDirection.E.__enum__ = behaviors_buildings_BuildingDirection;
+behaviors_buildings_BuildingDirection.W = ["W",3];
+behaviors_buildings_BuildingDirection.W.toString = $estr;
+behaviors_buildings_BuildingDirection.W.__enum__ = behaviors_buildings_BuildingDirection;
+var behaviors_buildings_BuildingGen = function(atlas,config) {
+	this._atlas = atlas;
+	this._config = config;
+};
+$hxClasses["behaviors.buildings.BuildingGen"] = behaviors_buildings_BuildingGen;
+behaviors_buildings_BuildingGen.__name__ = ["behaviors","buildings","BuildingGen"];
+behaviors_buildings_BuildingGen.prototype = {
+	create: function(xDir,yDir,basis,stage,roof) {
+		var _this = this._atlas.Frames;
+		var bImg = __map_reserved[basis] != null ? _this.getReserved(basis) : _this.h[basis];
+		var _this1 = this._atlas.Frames;
+		var sImg = __map_reserved[stage] != null ? _this1.getReserved(stage) : _this1.h[stage];
+		var _this2 = this._atlas.Frames;
+		var rImg = __map_reserved[roof] != null ? _this2.getReserved(roof) : _this2.h[roof];
+		return new behaviors_buildings_BuildingResource(bImg,sImg,rImg,48,36,xDir,yDir);
+	}
+	,genAll: function() {
+		var resultList = new List();
+		var _g = 0;
+		var _g1 = this._config;
+		while(_g < _g1.length) {
+			var c = _g1[_g];
+			++_g;
+			this.genAllFromConfig(c,resultList);
+		}
+		var length = resultList.length;
+		var this1 = new Array(length);
+		var result = this1;
+		var i = 0;
+		var _g_head = resultList.h;
+		while(_g_head != null) {
+			var val = _g_head.item;
+			_g_head = _g_head.next;
+			var b = val;
+			result[i] = b;
+			++i;
+		}
+		return result;
+	}
+	,genAllFromConfig: function(config,result) {
+		var _g = 0;
+		var _g1 = config.base;
+		while(_g < _g1.length) {
+			var b = _g1[_g];
+			++_g;
+			var _g2 = 0;
+			var _g3 = config.stage;
+			while(_g2 < _g3.length) {
+				var s = _g3[_g2];
+				++_g2;
+				var _g4 = 0;
+				var _g5 = config.roof;
+				while(_g4 < _g5.length) {
+					var r = _g5[_g4];
+					++_g4;
+					result.add(this.create(config.xDir,config.yDir,b,s,r));
+				}
+			}
+		}
+	}
+	,_config: null
+	,_fileName: null
+	,_ext: null
+	,_atlas: null
+	,__class__: behaviors_buildings_BuildingGen
+};
+var behaviors_buildings_BuildingGenConfig = function() { };
+$hxClasses["behaviors.buildings.BuildingGenConfig"] = behaviors_buildings_BuildingGenConfig;
+behaviors_buildings_BuildingGenConfig.__name__ = ["behaviors","buildings","BuildingGenConfig"];
+behaviors_buildings_BuildingGenConfig.prototype = {
+	xDir: null
+	,yDir: null
+	,base: null
+	,stage: null
+	,roof: null
+	,__class__: behaviors_buildings_BuildingGenConfig
+};
+var behaviors_buildings_BuildingInstance = function(x,y,state) {
+	this.State = state.encode();
+	this.TileAddress = x + (y << 16);
+};
+$hxClasses["behaviors.buildings.BuildingInstance"] = behaviors_buildings_BuildingInstance;
+behaviors_buildings_BuildingInstance.__name__ = ["behaviors","buildings","BuildingInstance"];
+behaviors_buildings_BuildingInstance.prototype = {
+	State: null
+	,TileAddress: null
+	,getX: function() {
+		return this.TileAddress & 65535;
+	}
+	,getY: function() {
+		return this.TileAddress & -65536;
+	}
+	,__class__: behaviors_buildings_BuildingInstance
+};
+var behaviors_buildings_BuildingResource = function(basis,stage,roof,baseH,stageH,xDir,yDir) {
+	this.Base = basis;
+	this.Stage = stage;
+	this.Roof = roof;
+	this.BaseH = baseH;
+	this.StageH = stageH;
+	this.XDir = xDir;
+	this.YDir = yDir;
+};
+$hxClasses["behaviors.buildings.BuildingResource"] = behaviors_buildings_BuildingResource;
+behaviors_buildings_BuildingResource.__name__ = ["behaviors","buildings","BuildingResource"];
+behaviors_buildings_BuildingResource.prototype = {
+	Base: null
+	,Stage: null
+	,Roof: null
+	,XDir: null
+	,YDir: null
+	,BaseH: null
+	,StageH: null
+	,Direction: null
+	,getTiles: function(x,y,size) {
+		if(size == 1) {
+			return [new kha_math_Vector2i(x,y)];
+		}
+		if(size == 2) {
+			return [new kha_math_Vector2i(x,y),new kha_math_Vector2i(x + this.XDir,y + this.YDir)];
+		}
+		return [new kha_math_Vector2i(x - 1,y - 1),new kha_math_Vector2i(x,y - 1),new kha_math_Vector2i(x + 1,y - 1),new kha_math_Vector2i(x - 1,y),new kha_math_Vector2i(x,y),new kha_math_Vector2i(x + 1,y),new kha_math_Vector2i(x - 1,y + 1),new kha_math_Vector2i(x,y + 1),new kha_math_Vector2i(x + 1,y + 1)];
+	}
+	,draw: function(layer,render,t,state) {
+		this.Base.draw(layer,render,t);
+		t.Y += this.BaseH;
+		var count = 2;
+		var _g1 = 0;
+		var _g = count;
+		while(_g1 < _g) {
+			var i = _g1++;
+			this.Stage.draw(layer,render,t);
+			t.Y += this.StageH;
+		}
+		this.Roof.draw(layer,render,t);
+	}
+	,__class__: behaviors_buildings_BuildingResource
+};
+var behaviors_buildings_BuildingState = function() {
+};
+$hxClasses["behaviors.buildings.BuildingState"] = behaviors_buildings_BuildingState;
+behaviors_buildings_BuildingState.__name__ = ["behaviors","buildings","BuildingState"];
+behaviors_buildings_BuildingState.prototype = {
+	StagesCount: null
+	,Health: null
+	,Size: null
+	,BuildingType: null
+	,encode: function() {
+		return this.StagesCount + (this.Health << 4) + (this.Size << 8) + (this.BuildingType << 16);
+	}
+	,decode: function(value) {
+		this.StagesCount = value & 15;
+		this.Health = (value & 240) >> 4;
+		this.Size = (value & 3840) >> 8;
+		this.BuildingType = (value & -65536) >> 16;
+	}
+	,__class__: behaviors_buildings_BuildingState
+};
+var behaviors_buildings_Buildings = function(tiles,states,renderData,buildings,buildingsInstances) {
+	this._tiles = tiles;
+	this._renderData = renderData;
+	this._tileStates = states;
+	this._buildings = buildings;
+	this._state = new behaviors_buildings_BuildingState();
+	this._buildingsInstances = buildingsInstances;
+	this.spawnBuildings(1000);
+};
+$hxClasses["behaviors.buildings.Buildings"] = behaviors_buildings_Buildings;
+behaviors_buildings_Buildings.__name__ = ["behaviors","buildings","Buildings"];
+behaviors_buildings_Buildings.__interfaces__ = [entities_IComponent];
+behaviors_buildings_Buildings.prototype = {
+	spawnBuilding: function(x,y,size,type) {
+		var building = this._buildings[type];
+		var tiles = building.getTiles(x,y,size);
+		if(!this._tileStates.validateTiles(tiles,0)) {
+			return null;
+		}
+		this._state.BuildingType = type;
+		this._state.StagesCount = Std.random(4);
+		var tmp = this._state.StagesCount;
+		var tmp1 = Std.random(3);
+		this._state.Health = tmp + tmp1;
+		this._state.Size = size;
+		var instance = new behaviors_buildings_BuildingInstance(x,y,this._state);
+		var id = this._buildingsInstances.length;
+		this._buildingsInstances[id] = instance;
+		this._tileStates.setTiles(tiles,id + 1);
+		utils_Statistics.Instance.reportBuildingsCount(this._buildingsInstances.length);
+		return instance;
+	}
+	,removeBuilding: function(b) {
+	}
+	,spawnBuildings: function(count) {
+		var _g = 0;
+		while(_g < 10000) {
+			var i = _g++;
+			var _g1 = 0;
+			while(_g1 < 10) {
+				var j = _g1++;
+				var rndX = Std.random(this._tileStates.SizeX);
+				var rndY = Std.random(this._tileStates.SizeY);
+				var type = Std.random(this._buildings.length);
+				var size = Std.random(3) + 1;
+				var result = this.spawnBuilding(rndX,rndY,size,type);
+				if(result != null) {
+					break;
+				}
+			}
+		}
+	}
+	,getSystemId: function() {
+		return entities_EntitySystem.SytemBehaviorId;
+	}
+	,load: function(e) {
+	}
+	,update: function(e) {
+		this._tiles.query(e.Frustum,this._renderData);
+	}
+	,_state: null
+	,_tiles: null
+	,_renderData: null
+	,_tileStates: null
+	,_gen: null
+	,_buildings: null
+	,_buildingsInstances: null
+	,__class__: behaviors_buildings_Buildings
+};
+var behaviors_buildings_BuildingsRender = function(layer,states,renderData,buildings,buildingsInstances) {
+	this.Layer = 0;
+	this.Layer = layer;
+	this._renderData = renderData;
+	this._tileStates = states;
+	this._buildings = buildings;
+	this._buildingsInstances = buildingsInstances;
+	this._buildingState = new behaviors_buildings_BuildingState();
+};
+$hxClasses["behaviors.buildings.BuildingsRender"] = behaviors_buildings_BuildingsRender;
+behaviors_buildings_BuildingsRender.__name__ = ["behaviors","buildings","BuildingsRender"];
+behaviors_buildings_BuildingsRender.__interfaces__ = [entities_IComponent];
+behaviors_buildings_BuildingsRender.prototype = {
+	Layer: null
+	,getSystemId: function() {
+		return entities_EntitySystem.SytemRenderId;
+	}
+	,load: function(e) {
+	}
+	,update: function(e) {
+		var t = engine_Transform.fromXY(0,0);
+		var _g1 = 0;
+		var _g = this._renderData.Count;
+		while(_g1 < _g) {
+			var i = _g1++;
+			var d = this._renderData.Data[i];
+			var state = this._tileStates.get(d.X,d.Y);
+			if(state == 0) {
+				continue;
+			}
+			var buildingInstnce = this._buildingsInstances[state - 1];
+			this._buildingState.decode(buildingInstnce.State);
+			t.X = d.RenderX;
+			t.Y = d.RenderY;
+			var type = this._buildingState.BuildingType;
+			this._buildings[type].draw(this.Layer,e.Render,t,this._buildingState);
+		}
+	}
+	,_renderData: null
+	,_tileStates: null
+	,_buildingsInstances: null
+	,_buildings: null
+	,_buildingState: null
+	,__class__: behaviors_buildings_BuildingsRender
+};
+var components_ComponentGuiRect = function(layer,aabb,image) {
+	this.Layer = 0;
+	this.Layer = layer;
+	this.Image = image;
+	this.Aabb = aabb;
+	this.Vertices = [aabb.minX(),aabb.minY(),0,1,aabb.minX(),aabb.maxY(),0,0,aabb.maxX(),aabb.maxY(),1,0,aabb.maxX(),aabb.minY(),1,1].slice(0);
+};
+$hxClasses["components.ComponentGuiRect"] = components_ComponentGuiRect;
+components_ComponentGuiRect.__name__ = ["components","ComponentGuiRect"];
+components_ComponentGuiRect.__interfaces__ = [entities_IComponent];
+components_ComponentGuiRect.prototype = {
+	Aabb: null
+	,Vertices: null
+	,Image: null
+	,Layer: null
+	,getSystemId: function() {
+		return entities_EntitySystem.SytemRenderId;
+	}
+	,load: function(e) {
+	}
+	,update: function(e) {
+		this.Image.drawQuad(this.Layer,e.Render,this.Vertices);
+	}
+	,__class__: components_ComponentGuiRect
 };
 var components_ComponentSprite = function(layer,image) {
 	this.Layer = 0;
@@ -756,8 +1146,9 @@ components_ComponentSprite.prototype = {
 	}
 	,__class__: components_ComponentSprite
 };
-var components_ComponentText = function(layer) {
+var components_ComponentText = function(layer,text) {
 	this.Layer = layer;
+	this.Text = text;
 };
 $hxClasses["components.ComponentText"] = components_ComponentText;
 components_ComponentText.__name__ = ["components","ComponentText"];
@@ -779,41 +1170,28 @@ components_ComponentText.prototype = {
 	}
 	,__class__: components_ComponentText
 };
-var components_ComponentTileMap = function(layer,tiles,atlas) {
+var components_ComponentTilesRender = function(layer,tiles,renderData) {
 	this.Layer = 0;
 	this.Layer = layer;
-	var _this = atlas.Frames;
-	this.Image = __map_reserved["buildingTiles_000.png"] != null ? _this.getReserved("buildingTiles_000.png") : _this.h["buildingTiles_000.png"];
-	var transform = new kha_math_FastMatrix2(50,-50,-25,-25);
-	this.TileMap = new engine_tilemap_TileMap(tiles,transform);
-	var this1 = new Array(16384);
-	this._renderTiles = this1;
-	var _g1 = 0;
-	var _g = this._renderTiles.length;
-	while(_g1 < _g) {
-		var i = _g1++;
-		this._renderTiles[i] = new engine_tilemap_TileInfo();
-	}
-	var palette = new engine_tilemap_TilesPalette("landscapeTiles_",".png",atlas);
+	this.TileMap = tiles;
+	this.RenderData = renderData;
 };
-$hxClasses["components.ComponentTileMap"] = components_ComponentTileMap;
-components_ComponentTileMap.__name__ = ["components","ComponentTileMap"];
-components_ComponentTileMap.__interfaces__ = [entities_IComponent];
-components_ComponentTileMap.prototype = {
-	Image: null
-	,Layer: null
+$hxClasses["components.ComponentTilesRender"] = components_ComponentTilesRender;
+components_ComponentTilesRender.__name__ = ["components","ComponentTilesRender"];
+components_ComponentTilesRender.__interfaces__ = [entities_IComponent];
+components_ComponentTilesRender.prototype = {
+	Layer: null
 	,TileMap: null
+	,RenderData: null
 	,getSystemId: function() {
 		return entities_EntitySystem.SytemRenderId;
 	}
 	,load: function(e) {
 	}
 	,update: function(e) {
-		var count = this.TileMap.query(e.Frustum,this._renderTiles);
-		this.TileMap.renderTiles(e.Frustum,e.Render,this._renderTiles,count,this.Image);
+		this.TileMap.renderTiles(this.Layer,e.Render,this.RenderData);
 	}
-	,_renderTiles: null
-	,__class__: components_ComponentTileMap
+	,__class__: components_ComponentTilesRender
 };
 var components_ComponentTransform = function(value) {
 	this.Value = value;
@@ -962,6 +1340,15 @@ engine_Transform.prototype = {
 	}
 	,__class__: engine_Transform
 };
+var engine_Viewport = function() {
+};
+$hxClasses["engine.Viewport"] = engine_Viewport;
+engine_Viewport.__name__ = ["engine","Viewport"];
+engine_Viewport.prototype = {
+	Width: null
+	,Height: null
+	,__class__: engine_Viewport
+};
 var engine_input_MotionHandleMode = $hxClasses["engine.input.MotionHandleMode"] = { __ename__ : true, __constructs__ : ["None","Joint","Handled"] };
 engine_input_MotionHandleMode.None = ["None",0];
 engine_input_MotionHandleMode.None.toString = $estr;
@@ -1016,38 +1403,31 @@ engine_input_MotionsManager.prototype = {
 	,reportMotion: function(type,id,x,y) {
 		this._motions.add(new engine_input_MotionInfo(type,id,x,y));
 	}
-	,update: function() {
+	,update: function(e) {
+		var sx = e.Viewport.Width / 2 | 0;
+		var sy = e.Viewport.Height / 2 | 0;
 		var _g_head = this._motions.h;
 		while(_g_head != null) {
 			var val = _g_head.item;
 			_g_head = _g_head.next;
 			var m = val;
+			var x = m.X - sx;
+			var y = sy - m.Y;
 			var _g = 0;
 			var _g1 = this._handlers;
-			try {
-				while(_g < _g1.length) {
-					var h = _g1[_g];
-					++_g;
-					var _g2 = m.Motion;
-					switch(_g2[1]) {
-					case 0:
-						throw "__break__";
-						break;
-					case 1:
-						h.motionStart(m.X,m.Y);
-						throw "__break__";
-						break;
-					case 2:
-						h.motionEnd(m.X,m.Y);
-						throw "__break__";
-						break;
-					case 3:
-						h.motionMove(m.X,m.Y);
-						throw "__break__";
-						break;
-					}
+			while(_g < _g1.length) {
+				var h = _g1[_g];
+				++_g;
+				if(m.Motion == engine_input_MotionType.Start) {
+					h.motionStart(x,y);
 				}
-			} catch( e ) { if( e != "__break__" ) throw e; }
+				if(m.Motion == engine_input_MotionType.Move) {
+					h.motionMove(x,y);
+				}
+				if(m.Motion == engine_input_MotionType.End) {
+					h.motionEnd(x,y);
+				}
+			}
 		}
 		this._motions.clear();
 	}
@@ -1232,7 +1612,7 @@ var engine_render_RenderService = function() {
 	this._pipeline.depthMode = kha_graphics4_CompareMode.Always;
 	this._pipeline.cullMode = kha_graphics4_CullMode.None;
 	this._pipeline.blendOperation = kha_graphics4_BlendingOperation.Add;
-	this._pipeline.blendSource = kha_graphics4_BlendingFactor.SourceAlpha;
+	this._pipeline.blendSource = kha_graphics4_BlendingFactor.BlendOne;
 	this._pipeline.blendDestination = kha_graphics4_BlendingFactor.InverseSourceAlpha;
 	this._pipeline.compile();
 	this._transfomID = this._pipeline.getConstantLocation("projection");
@@ -1504,15 +1884,27 @@ engine_resources_ResourceFont.prototype = {
 	,Kernings: null
 	,LineHeight: null
 	,LineBase: null
-	,draw: function(layer,render,transform,text) {
+	,getSize: function(text) {
 		var i = 0;
 		var x = 0;
+		while(i < text.length) {
+			var ch = HxOverrides.cca(text,i);
+			var glyph = this.Glyphs.h[ch];
+			x += glyph.XAdvance;
+			++i;
+		}
+		return x;
+	}
+	,draw: function(layer,render,transform,text) {
+		var y = -(this.LineBase - (this.LineHeight - this.LineBase)) * 0.5 * transform.ScaleY;
+		var x = -this.getSize(text) * 0.5 * transform.ScaleX;
 		var t = transform.clone();
+		var i = 0;
 		while(i < text.length) {
 			var ch = HxOverrides.cca(text,i);
 			var glyph = this.Glyphs.h[ch];
 			t.X = transform.X + x + glyph.RenderXOffset * t.ScaleX;
-			t.Y = transform.Y + glyph.RenderYOffset * t.ScaleY;
+			t.Y = transform.Y + y + glyph.RenderYOffset * t.ScaleY;
 			glyph.Texture.draw(layer,render,t);
 			x += glyph.XAdvance * t.ScaleX;
 			++i;
@@ -1555,15 +1947,26 @@ engine_resources_ResourceImage.prototype = {
 	Vertices: null
 	,Indices: null
 	,Texture: null
+	,hitTest: function(x,y,transform) {
+		var sx = this.Texture.get_width() * transform.ScaleX / 2;
+		var sy = this.Texture.get_height() * transform.ScaleX / 2;
+		var tx = x - transform.X;
+		var ty = y - transform.Y;
+		if(-sx <= tx && tx <= sx && -sy <= ty) {
+			return ty <= sy;
+		} else {
+			return false;
+		}
+	}
 	,createSubImage: function(x,y,w,h) {
 		var result = new engine_resources_ResourceImage();
 		result.Texture = this.Texture;
 		var sx = w / 2;
 		var sy = h / 2;
-		var tx0 = x / (this.Texture.get_width() - 1);
-		var ty0 = y / (this.Texture.get_height() - 1);
-		var tx1 = (x + w - 1) / (this.Texture.get_width() - 1);
-		var ty1 = (y + h - 1) / (this.Texture.get_height() - 1);
+		var tx0 = x / this.Texture.get_width();
+		var ty0 = y / this.Texture.get_height();
+		var tx1 = (x + w) / this.Texture.get_width();
+		var ty1 = (y + h) / this.Texture.get_height();
 		result.Vertices = [-sx,-sy,tx0,ty1,-sx,sy,tx0,ty0,sx,sy,tx1,ty0,sx,-sy,tx1,ty1].slice(0);
 		result.Indices = engine_resources_ResourceImage.QuadIndices;
 		return result;
@@ -1603,49 +2006,35 @@ engine_resources_ResourceImage.prototype = {
 	,draw: function(layer,render,transform) {
 		render.drawImage(layer,this.Texture,this.Vertices,this.Indices,transform);
 	}
+	,drawQuad: function(layer,render,vertices) {
+		render.drawImage(layer,this.Texture,vertices,engine_resources_ResourceImage.QuadIndices,engine_Transform.empty);
+	}
 	,__class__: engine_resources_ResourceImage
 };
 var engine_resources_ResourceTileMap = function() {
+	this.Data = new engine_tilemap_TileStruct();
 };
 $hxClasses["engine.resources.ResourceTileMap"] = engine_resources_ResourceTileMap;
 engine_resources_ResourceTileMap.__name__ = ["engine","resources","ResourceTileMap"];
-engine_resources_ResourceTileMap.fromValue = function(sizeX,sizeY,value) {
-	var result = new engine_resources_ResourceTileMap();
-	result.SizeX = sizeX;
-	result.SizeY = sizeY;
-	var this1 = new Array(sizeX * sizeY);
-	result.Map = this1;
-	var _g1 = 0;
-	var _g = result.Map.length;
-	while(_g1 < _g) {
-		var i = _g1++;
-		result.Map[i] = value;
-	}
-	return result;
-};
 engine_resources_ResourceTileMap.fromBlob = function(jsonData) {
 	var jsonTiles = JSON.parse(jsonData.toString());
 	var layer = jsonTiles.layers[0];
 	var result = new engine_resources_ResourceTileMap();
-	result.SizeX = layer.width;
-	result.SizeY = layer.height;
-	result.Map = layer.data;
+	result.Data.SizeX = layer.width;
+	result.Data.SizeY = layer.height;
+	var length = layer.data.length;
+	var this1 = new Array(length);
+	result.Data.Map = this1;
+	var _g1 = 0;
+	var _g = result.Data.Map.length;
+	while(_g1 < _g) {
+		var i = _g1++;
+		result.Data.Map[i] = layer.data[i] - 1;
+	}
 	return result;
 };
 engine_resources_ResourceTileMap.prototype = {
-	SizeX: null
-	,SizeY: null
-	,Map: null
-	,get: function(x,y) {
-		var rx = engine_MathHelpers.range(x,this.SizeX);
-		var ry = engine_MathHelpers.range(y,this.SizeY);
-		return this.Map[ry * this.SizeX + rx];
-	}
-	,set: function(x,y,value) {
-		var rx = engine_MathHelpers.range(x,this.SizeX);
-		var ry = engine_MathHelpers.range(y,this.SizeY);
-		this.Map[ry * this.SizeX + rx] = value;
-	}
+	Data: null
 	,__class__: engine_resources_ResourceTileMap
 };
 var engine_resources_JsonTilesLayer = function() { };
@@ -1686,16 +2075,53 @@ engine_tilemap_TileInfo.prototype = {
 	,Value: null
 	,__class__: engine_tilemap_TileInfo
 };
-var engine_tilemap_TileMap = function(tiles,transform) {
+var engine_tilemap_TileInfos = function(caheSize) {
+	var this1 = new Array(caheSize);
+	this.Data = this1;
+	this.Count = 0;
+	var _g1 = 0;
+	var _g = this.Data.length;
+	while(_g1 < _g) {
+		var i = _g1++;
+		this.Data[i] = new engine_tilemap_TileInfo();
+	}
+};
+$hxClasses["engine.tilemap.TileInfos"] = engine_tilemap_TileInfos;
+engine_tilemap_TileInfos.__name__ = ["engine","tilemap","TileInfos"];
+engine_tilemap_TileInfos.prototype = {
+	Data: null
+	,Count: null
+	,clear: function() {
+		this.Count = 0;
+	}
+	,add: function(x,y,rx,ry,value) {
+		if(this.Count >= this.Data.length) {
+			return false;
+		}
+		var info = this.Data[this.Count];
+		info.X = x;
+		info.Y = y;
+		info.RenderX = rx;
+		info.RenderY = ry;
+		info.Value = value;
+		this.Count++;
+		return true;
+	}
+	,__class__: engine_tilemap_TileInfos
+};
+var engine_tilemap_TileMap = function(tiles,transform,palette) {
 	this.Tiles = tiles;
 	this.Axis = transform;
+	this.Palette = palette;
 };
 $hxClasses["engine.tilemap.TileMap"] = engine_tilemap_TileMap;
 engine_tilemap_TileMap.__name__ = ["engine","tilemap","TileMap"];
 engine_tilemap_TileMap.prototype = {
 	Tiles: null
 	,Axis: null
+	,Palette: null
 	,query: function(frustum,resultTiles) {
+		resultTiles.clear();
 		var inverse = engine_MathHelpers.inverseMatrix2(this.Axis);
 		var value_y;
 		var value_x = frustum.X - frustum.Sx;
@@ -1723,60 +2149,160 @@ engine_tilemap_TileMap.prototype = {
 		var invf3 = engine_Aabb.fromVertices2([invf,invf1,invf2,new kha_math_FastVector2(x3,y3)]);
 		var minY = engine_MathHelpers.range(invf3.minY() - 1 | 0,this.Tiles.SizeY);
 		var minX = engine_MathHelpers.range(invf3.minX() - 1 | 0,this.Tiles.SizeX);
-		var maxY = engine_MathHelpers.range(invf3.maxY() + 1 | 0,this.Tiles.SizeY) + 1;
-		var maxX = engine_MathHelpers.range(invf3.maxX() + 1 | 0,this.Tiles.SizeX) + 1;
-		var i = 0;
+		var maxY = engine_MathHelpers.range(invf3.maxY() + 1 | 0,this.Tiles.SizeY);
+		var maxX = engine_MathHelpers.range(invf3.maxX() + 1 | 0,this.Tiles.SizeX);
 		var p_y;
 		var p_x = 0;
 		p_y = 0;
-		var _g1 = minY;
-		var _g = maxY;
-		while(_g1 < _g) {
-			var y4 = _g1++;
-			var _g3 = minX;
-			var _g2 = maxX;
-			while(_g3 < _g2) {
-				var x4 = _g3++;
-				if(i >= resultTiles.length) {
-					return resultTiles.length;
+		var walker = new engine_tilemap_TilesWalker(frustum,resultTiles,this.Axis,this.Tiles);
+		var posY = minY;
+		while(posY < maxY) {
+			var x4 = minX;
+			var y4 = posY;
+			while(y4 >= minY && x4 <= maxX) {
+				if(!walker.Walk(x4,y4)) {
+					return;
 				}
-				p_x = x4;
-				p_y = y4;
-				var ps_y;
-				var ps_x;
-				var _this = this.Axis;
-				var x5 = _this._00 * p_x + _this._10 * p_y;
-				var y5 = _this._01 * p_x + _this._11 * p_y;
-				ps_x = x5;
-				ps_y = y5;
-				if(!frustum.include(ps_x,ps_y)) {
-					continue;
-				}
-				resultTiles[i].X = x4;
-				resultTiles[i].Y = y4;
-				resultTiles[i].RenderX = ps_x;
-				resultTiles[i].RenderY = ps_y;
-				resultTiles[i].Value = this.Tiles.get(x4,y4);
-				++i;
+				++x4;
+				--y4;
 			}
+			++posY;
 		}
-		return i;
+		var posX = minX;
+		while(posX <= maxX) {
+			var x5 = posX;
+			var y5 = maxY;
+			while(y5 >= minY && x5 <= maxX) {
+				if(!walker.Walk(x5,y5)) {
+					return;
+				}
+				++x5;
+				--y5;
+			}
+			++posX;
+		}
 	}
-	,renderTiles: function(frustum,render,resultTiles,count,defaultImage) {
+	,renderTiles: function(layer,render,resultTiles) {
 		var t = engine_Transform.fromXY(0,0);
 		var _g1 = 0;
-		var _g = count;
+		var _g = resultTiles.Count;
 		while(_g1 < _g) {
 			var i = _g1++;
-			var tile = resultTiles[i];
+			var tile = resultTiles.Data[i];
 			t.X = tile.RenderX;
 			t.Y = tile.RenderY;
-			defaultImage.draw(engine_render_RenderLayer.GameLayer0,render,t);
+			var image = this.Palette.Data[tile.Value];
+			if(image == null) {
+				continue;
+			}
+			image.draw(layer,render,t);
 		}
 	}
 	,__class__: engine_tilemap_TileMap
 };
+var engine_tilemap_TilesWalker = function(frustum,resultTiles,axis,tiles) {
+	this.p = new kha_math_FastVector2(0,0);
+	this.Index = 0;
+	this.Frustum = frustum;
+	this.ResultTiles = resultTiles;
+	this.Axis = axis;
+	this.Tiles = tiles;
+};
+$hxClasses["engine.tilemap.TilesWalker"] = engine_tilemap_TilesWalker;
+engine_tilemap_TilesWalker.__name__ = ["engine","tilemap","TilesWalker"];
+engine_tilemap_TilesWalker.prototype = {
+	ResultTiles: null
+	,Frustum: null
+	,Index: null
+	,Axis: null
+	,Tiles: null
+	,p: null
+	,Walk: function(x,y) {
+		this.p.x = x;
+		this.p.y = y;
+		var ps_y;
+		var ps_x;
+		var _this = this.Axis;
+		var value = this.p;
+		var x1 = _this._00 * value.x + _this._10 * value.y;
+		var y1 = _this._01 * value.x + _this._11 * value.y;
+		ps_x = x1;
+		ps_y = y1;
+		if(!this.Frustum.include(ps_x,ps_y)) {
+			return true;
+		}
+		return this.ResultTiles.add(x,y,ps_x,ps_y,this.Tiles.get(x,y));
+	}
+	,__class__: engine_tilemap_TilesWalker
+};
+var engine_tilemap_TileStruct = function() {
+};
+$hxClasses["engine.tilemap.TileStruct"] = engine_tilemap_TileStruct;
+engine_tilemap_TileStruct.__name__ = ["engine","tilemap","TileStruct"];
+engine_tilemap_TileStruct.fromValue = function(sizeX,sizeY,value) {
+	var result = new engine_tilemap_TileStruct();
+	result.SizeX = sizeX;
+	result.SizeY = sizeY;
+	var this1 = new Array(sizeX * sizeY);
+	result.Map = this1;
+	var _g1 = 0;
+	var _g = result.Map.length;
+	while(_g1 < _g) {
+		var i = _g1++;
+		result.Map[i] = value;
+	}
+	return result;
+};
+engine_tilemap_TileStruct.prototype = {
+	SizeX: null
+	,SizeY: null
+	,Map: null
+	,validateTiles: function(tiles,value) {
+		var _g = 0;
+		while(_g < tiles.length) {
+			var v = tiles[_g];
+			++_g;
+			if(v.x < 0) {
+				return false;
+			}
+			if(v.y < 0) {
+				return false;
+			}
+			if(v.x >= this.SizeX) {
+				return false;
+			}
+			if(v.y >= this.SizeX) {
+				return false;
+			}
+			if(this.get(v.x,v.y) != value) {
+				return false;
+			}
+		}
+		return true;
+	}
+	,setTiles: function(tiles,value) {
+		var _g = 0;
+		while(_g < tiles.length) {
+			var v = tiles[_g];
+			++_g;
+			this.set(v.x,v.y,value);
+		}
+	}
+	,getAddress: function(x,y) {
+		var rx = engine_MathHelpers.range(x,this.SizeX);
+		var ry = engine_MathHelpers.range(y,this.SizeY);
+		return ry * this.SizeX + rx;
+	}
+	,get: function(x,y) {
+		return this.Map[this.getAddress(x,y)];
+	}
+	,set: function(x,y,value) {
+		this.Map[this.getAddress(x,y)] = value;
+	}
+	,__class__: engine_tilemap_TileStruct
+};
 var engine_tilemap_TilesPalette = function(name,ext,atlas) {
+	var data = [];
 	var file = atlas.Frames.keys();
 	while(file.hasNext()) {
 		var file1 = file.next();
@@ -1788,7 +2314,13 @@ var engine_tilemap_TilesPalette = function(name,ext,atlas) {
 		}
 		var numberString = HxOverrides.substr(file1,name.length,file1.length - name.length - ext.length);
 		var number = Std.parseInt(numberString);
+		if(number == null) {
+			continue;
+		}
+		var _this = atlas.Frames;
+		data[number] = __map_reserved[file1] != null ? _this.getReserved(file1) : _this.h[file1];
 	}
+	this.Data = data.slice(0);
 };
 $hxClasses["engine.tilemap.TilesPalette"] = engine_tilemap_TilesPalette;
 engine_tilemap_TilesPalette.__name__ = ["engine","tilemap","TilesPalette"];
@@ -1946,11 +2478,13 @@ var entities_UpdateContext = function(render,motions,ellapsetTime) {
 	this.Render = render;
 	this.EllapsetTime = ellapsetTime;
 	this.Frustum = engine_Aabb.fromXY(0,0);
+	this.Viewport = new engine_Viewport();
 };
 $hxClasses["entities.UpdateContext"] = entities_UpdateContext;
 entities_UpdateContext.__name__ = ["entities","UpdateContext"];
 entities_UpdateContext.prototype = {
-	Frustum: null
+	Viewport: null
+	,Frustum: null
 	,Render: null
 	,EllapsetTime: null
 	,Motions: null
@@ -3950,7 +4484,13 @@ js_html_compat_Uint8Array._subarray = function(start,end) {
 	return a;
 };
 var kha__$Assets_ImageList = function() {
-	this.names = ["all_scene_images","calibri_0"];
+	this.names = ["all_scene_images","calibri_0","green_button1","red_button"];
+	this.red_buttonDescription = { files : ["red_button.png"], original_height : 120, type : "image", original_width : 120, name : "red_button"};
+	this.red_buttonName = "red_button";
+	this.red_button = null;
+	this.green_button1Description = { files : ["green_button1.png"], original_height : 120, type : "image", original_width : 120, name : "green_button1"};
+	this.green_button1Name = "green_button1";
+	this.green_button1 = null;
 	this.calibri_0Description = { files : ["calibri_0.png"], original_height : 512, type : "image", original_width : 512, name : "calibri_0"};
 	this.calibri_0Name = "calibri_0";
 	this.calibri_0 = null;
@@ -3985,6 +4525,30 @@ kha__$Assets_ImageList.prototype = {
 		this.calibri_0.unload();
 		this.calibri_0 = null;
 	}
+	,green_button1: null
+	,green_button1Name: null
+	,green_button1Description: null
+	,green_button1Load: function(done) {
+		kha_Assets.loadImage("green_button1",function(image) {
+			done();
+		});
+	}
+	,green_button1Unload: function() {
+		this.green_button1.unload();
+		this.green_button1 = null;
+	}
+	,red_button: null
+	,red_buttonName: null
+	,red_buttonDescription: null
+	,red_buttonLoad: function(done) {
+		kha_Assets.loadImage("red_button",function(image) {
+			done();
+		});
+	}
+	,red_buttonUnload: function() {
+		this.red_button.unload();
+		this.red_button = null;
+	}
 	,names: null
 	,__class__: kha__$Assets_ImageList
 };
@@ -3998,13 +4562,16 @@ kha__$Assets_SoundList.prototype = {
 	,__class__: kha__$Assets_SoundList
 };
 var kha__$Assets_BlobList = function() {
-	this.names = ["all_scene_images_json","calibri_fnt","tiles_json"];
+	this.names = ["all_scene_images_json","buildings_json","calibri_fnt","tiles_json"];
 	this.tiles_jsonDescription = { files : ["tiles.json"], type : "blob", name : "tiles_json"};
 	this.tiles_jsonName = "tiles_json";
 	this.tiles_json = null;
 	this.calibri_fntDescription = { files : ["calibri.fnt"], type : "blob", name : "calibri_fnt"};
 	this.calibri_fntName = "calibri_fnt";
 	this.calibri_fnt = null;
+	this.buildings_jsonDescription = { files : ["buildings.json"], type : "blob", name : "buildings_json"};
+	this.buildings_jsonName = "buildings_json";
+	this.buildings_json = null;
 	this.all_scene_images_jsonDescription = { files : ["all_scene_images.json"], type : "blob", name : "all_scene_images_json"};
 	this.all_scene_images_jsonName = "all_scene_images_json";
 	this.all_scene_images_json = null;
@@ -4023,6 +4590,18 @@ kha__$Assets_BlobList.prototype = {
 	,all_scene_images_jsonUnload: function() {
 		this.all_scene_images_json.unload();
 		this.all_scene_images_json = null;
+	}
+	,buildings_json: null
+	,buildings_jsonName: null
+	,buildings_jsonDescription: null
+	,buildings_jsonLoad: function(done) {
+		kha_Assets.loadBlob("buildings_json",function(blob) {
+			done();
+		});
+	}
+	,buildings_jsonUnload: function() {
+		this.buildings_json.unload();
+		this.buildings_json = null;
 	}
 	,calibri_fnt: null
 	,calibri_fntName: null
@@ -5733,38 +6312,38 @@ kha_Shaders.init = function() {
 	var _g2 = 0;
 	while(_g2 < 3) {
 		var i2 = _g2++;
-		var data2 = Reflect.field(kha_Shaders,"painter_colored_vertData" + i2);
+		var data2 = Reflect.field(kha_Shaders,"painter_colored_fragData" + i2);
 		var bytes2 = haxe_Unserializer.run(data2);
 		blobs2.push(kha_internal_BytesBlob.fromBytes(bytes2));
 	}
-	kha_Shaders.painter_colored_vert = new kha_graphics4_VertexShader(blobs2,["painter-colored.vert.essl","painter-colored-relaxed.vert.essl","painter-colored-webgl2.vert.essl"]);
+	kha_Shaders.painter_colored_frag = new kha_graphics4_FragmentShader(blobs2,["painter-colored.frag.essl","painter-colored-relaxed.frag.essl","painter-colored-webgl2.frag.essl"]);
 	var blobs3 = [];
 	var _g3 = 0;
 	while(_g3 < 3) {
 		var i3 = _g3++;
-		var data3 = Reflect.field(kha_Shaders,"painter_image_vertData" + i3);
+		var data3 = Reflect.field(kha_Shaders,"painter_colored_vertData" + i3);
 		var bytes3 = haxe_Unserializer.run(data3);
 		blobs3.push(kha_internal_BytesBlob.fromBytes(bytes3));
 	}
-	kha_Shaders.painter_image_vert = new kha_graphics4_VertexShader(blobs3,["painter-image.vert.essl","painter-image-relaxed.vert.essl","painter-image-webgl2.vert.essl"]);
+	kha_Shaders.painter_colored_vert = new kha_graphics4_VertexShader(blobs3,["painter-colored.vert.essl","painter-colored-relaxed.vert.essl","painter-colored-webgl2.vert.essl"]);
 	var blobs4 = [];
 	var _g4 = 0;
 	while(_g4 < 3) {
 		var i4 = _g4++;
-		var data4 = Reflect.field(kha_Shaders,"painter_colored_fragData" + i4);
+		var data4 = Reflect.field(kha_Shaders,"painter_image_fragData" + i4);
 		var bytes4 = haxe_Unserializer.run(data4);
 		blobs4.push(kha_internal_BytesBlob.fromBytes(bytes4));
 	}
-	kha_Shaders.painter_colored_frag = new kha_graphics4_FragmentShader(blobs4,["painter-colored.frag.essl","painter-colored-relaxed.frag.essl","painter-colored-webgl2.frag.essl"]);
+	kha_Shaders.painter_image_frag = new kha_graphics4_FragmentShader(blobs4,["painter-image.frag.essl","painter-image-relaxed.frag.essl","painter-image-webgl2.frag.essl"]);
 	var blobs5 = [];
 	var _g5 = 0;
 	while(_g5 < 3) {
 		var i5 = _g5++;
-		var data5 = Reflect.field(kha_Shaders,"painter_image_fragData" + i5);
+		var data5 = Reflect.field(kha_Shaders,"painter_image_vertData" + i5);
 		var bytes5 = haxe_Unserializer.run(data5);
 		blobs5.push(kha_internal_BytesBlob.fromBytes(bytes5));
 	}
-	kha_Shaders.painter_image_frag = new kha_graphics4_FragmentShader(blobs5,["painter-image.frag.essl","painter-image-relaxed.frag.essl","painter-image-webgl2.frag.essl"]);
+	kha_Shaders.painter_image_vert = new kha_graphics4_VertexShader(blobs5,["painter-image.vert.essl","painter-image-relaxed.vert.essl","painter-image-webgl2.vert.essl"]);
 	var blobs6 = [];
 	var _g6 = 0;
 	while(_g6 < 3) {
@@ -25080,12 +25659,14 @@ var utils_Statistics = function() {
 	this._lastTime = -1;
 	this.LastFpsPerSecond = 0;
 	this.LastRenderDelay = 0;
+	this.BuildingsCount = 0;
 	this.LastFps = 0;
 };
 $hxClasses["utils.Statistics"] = utils_Statistics;
 utils_Statistics.__name__ = ["utils","Statistics"];
 utils_Statistics.prototype = {
 	LastFps: null
+	,BuildingsCount: null
 	,LastRenderDelay: null
 	,LastFpsPerSecond: null
 	,reportRenderFrame: function(realTime) {
@@ -25101,6 +25682,9 @@ utils_Statistics.prototype = {
 			this._framesCount = 0;
 			this._perSecondTime = 0;
 		}
+	}
+	,reportBuildingsCount: function(count) {
+		this.BuildingsCount = count;
 	}
 	,_lastTime: null
 	,_perSecondTime: null
@@ -25142,6 +25726,7 @@ Xml.ProcessingInstruction = 5;
 Xml.Document = 6;
 engine_MathHelpers.MaxFloat = 1e20;
 engine_MathHelpers.MinFloat = -1e20;
+engine_Transform.empty = new engine_Transform(0,0,1,1);
 engine_render_RenderLayer.GameLayer0 = 0;
 engine_render_RenderLayer.GameLayer1 = 1;
 engine_render_RenderLayer.GuiLayer = 2;
@@ -25255,18 +25840,18 @@ kha_Shaders.painter_texture_fragData2 = "s298:I3ZlcnNpb24gMzAwIGVzCnByZWNpc2lvbi
 kha_Shaders.painter_texture_vertData0 = "s252:I3ZlcnNpb24gMTAwCgp1bmlmb3JtIG1hdDQgcHJvamVjdGlvbjsKCmF0dHJpYnV0ZSB2ZWMyIHh5Owp2YXJ5aW5nIHZlYzIgdGV4Q29vcmQ7CmF0dHJpYnV0ZSB2ZWMyIHV2OwoKdm9pZCBtYWluKCkKewogICAgZ2xfUG9zaXRpb24gPSBwcm9qZWN0aW9uICogdmVjNCh4eSwgMC4wLCAxLjApOwogICAgdGV4Q29vcmQgPSB1djsKfQoK";
 kha_Shaders.painter_texture_vertData1 = "s295:I3ZlcnNpb24gMTAwCgp1bmlmb3JtIG1lZGl1bXAgbWF0NCBwcm9qZWN0aW9uOwoKYXR0cmlidXRlIG1lZGl1bXAgdmVjMiB4eTsKdmFyeWluZyBtZWRpdW1wIHZlYzIgdGV4Q29vcmQ7CmF0dHJpYnV0ZSBtZWRpdW1wIHZlYzIgdXY7Cgp2b2lkIG1haW4oKQp7CiAgICBnbF9Qb3NpdGlvbiA9IHByb2plY3Rpb24gKiB2ZWM0KHh5LCAwLjAsIDEuMCk7CiAgICB0ZXhDb29yZCA9IHV2Owp9Cgo";
 kha_Shaders.painter_texture_vertData2 = "s275:I3ZlcnNpb24gMzAwIGVzCgp1bmlmb3JtIG1lZGl1bXAgbWF0NCBwcm9qZWN0aW9uOwoKaW4gbWVkaXVtcCB2ZWMyIHh5OwpvdXQgbWVkaXVtcCB2ZWMyIHRleENvb3JkOwppbiBtZWRpdW1wIHZlYzIgdXY7Cgp2b2lkIG1haW4oKQp7CiAgICBnbF9Qb3NpdGlvbiA9IHByb2plY3Rpb24gKiB2ZWM0KHh5LCAwLjAsIDEuMCk7CiAgICB0ZXhDb29yZCA9IHV2Owp9Cgo";
-kha_Shaders.painter_colored_vertData0 = "s331:I3ZlcnNpb24gMTAwCgp1bmlmb3JtIG1hdDQgcHJvamVjdGlvbk1hdHJpeDsKCmF0dHJpYnV0ZSB2ZWMzIHZlcnRleFBvc2l0aW9uOwp2YXJ5aW5nIHZlYzQgZnJhZ21lbnRDb2xvcjsKYXR0cmlidXRlIHZlYzQgdmVydGV4Q29sb3I7Cgp2b2lkIG1haW4oKQp7CiAgICBnbF9Qb3NpdGlvbiA9IHByb2plY3Rpb25NYXRyaXggKiB2ZWM0KHZlcnRleFBvc2l0aW9uLCAxLjApOwogICAgZnJhZ21lbnRDb2xvciA9IHZlcnRleENvbG9yOwp9Cgo";
-kha_Shaders.painter_colored_vertData1 = "s374:I3ZlcnNpb24gMTAwCgp1bmlmb3JtIG1lZGl1bXAgbWF0NCBwcm9qZWN0aW9uTWF0cml4OwoKYXR0cmlidXRlIG1lZGl1bXAgdmVjMyB2ZXJ0ZXhQb3NpdGlvbjsKdmFyeWluZyBtZWRpdW1wIHZlYzQgZnJhZ21lbnRDb2xvcjsKYXR0cmlidXRlIG1lZGl1bXAgdmVjNCB2ZXJ0ZXhDb2xvcjsKCnZvaWQgbWFpbigpCnsKICAgIGdsX1Bvc2l0aW9uID0gcHJvamVjdGlvbk1hdHJpeCAqIHZlYzQodmVydGV4UG9zaXRpb24sIDEuMCk7CiAgICBmcmFnbWVudENvbG9yID0gdmVydGV4Q29sb3I7Cn0KCg";
-kha_Shaders.painter_colored_vertData2 = "s354:I3ZlcnNpb24gMzAwIGVzCgp1bmlmb3JtIG1lZGl1bXAgbWF0NCBwcm9qZWN0aW9uTWF0cml4OwoKaW4gbWVkaXVtcCB2ZWMzIHZlcnRleFBvc2l0aW9uOwpvdXQgbWVkaXVtcCB2ZWM0IGZyYWdtZW50Q29sb3I7CmluIG1lZGl1bXAgdmVjNCB2ZXJ0ZXhDb2xvcjsKCnZvaWQgbWFpbigpCnsKICAgIGdsX1Bvc2l0aW9uID0gcHJvamVjdGlvbk1hdHJpeCAqIHZlYzQodmVydGV4UG9zaXRpb24sIDEuMCk7CiAgICBmcmFnbWVudENvbG9yID0gdmVydGV4Q29sb3I7Cn0KCg";
-kha_Shaders.painter_image_vertData0 = "s415:I3ZlcnNpb24gMTAwCgp1bmlmb3JtIG1hdDQgcHJvamVjdGlvbk1hdHJpeDsKCmF0dHJpYnV0ZSB2ZWMzIHZlcnRleFBvc2l0aW9uOwp2YXJ5aW5nIHZlYzIgdGV4Q29vcmQ7CmF0dHJpYnV0ZSB2ZWMyIHRleFBvc2l0aW9uOwp2YXJ5aW5nIHZlYzQgY29sb3I7CmF0dHJpYnV0ZSB2ZWM0IHZlcnRleENvbG9yOwoKdm9pZCBtYWluKCkKewogICAgZ2xfUG9zaXRpb24gPSBwcm9qZWN0aW9uTWF0cml4ICogdmVjNCh2ZXJ0ZXhQb3NpdGlvbiwgMS4wKTsKICAgIHRleENvb3JkID0gdGV4UG9zaXRpb247CiAgICBjb2xvciA9IHZlcnRleENvbG9yOwp9Cgo";
-kha_Shaders.painter_image_vertData1 = "s479:I3ZlcnNpb24gMTAwCgp1bmlmb3JtIG1lZGl1bXAgbWF0NCBwcm9qZWN0aW9uTWF0cml4OwoKYXR0cmlidXRlIG1lZGl1bXAgdmVjMyB2ZXJ0ZXhQb3NpdGlvbjsKdmFyeWluZyBtZWRpdW1wIHZlYzIgdGV4Q29vcmQ7CmF0dHJpYnV0ZSBtZWRpdW1wIHZlYzIgdGV4UG9zaXRpb247CnZhcnlpbmcgbWVkaXVtcCB2ZWM0IGNvbG9yOwphdHRyaWJ1dGUgbWVkaXVtcCB2ZWM0IHZlcnRleENvbG9yOwoKdm9pZCBtYWluKCkKewogICAgZ2xfUG9zaXRpb24gPSBwcm9qZWN0aW9uTWF0cml4ICogdmVjNCh2ZXJ0ZXhQb3NpdGlvbiwgMS4wKTsKICAgIHRleENvb3JkID0gdGV4UG9zaXRpb247CiAgICBjb2xvciA9IHZlcnRleENvbG9yOwp9Cgo";
-kha_Shaders.painter_image_vertData2 = "s444:I3ZlcnNpb24gMzAwIGVzCgp1bmlmb3JtIG1lZGl1bXAgbWF0NCBwcm9qZWN0aW9uTWF0cml4OwoKaW4gbWVkaXVtcCB2ZWMzIHZlcnRleFBvc2l0aW9uOwpvdXQgbWVkaXVtcCB2ZWMyIHRleENvb3JkOwppbiBtZWRpdW1wIHZlYzIgdGV4UG9zaXRpb247Cm91dCBtZWRpdW1wIHZlYzQgY29sb3I7CmluIG1lZGl1bXAgdmVjNCB2ZXJ0ZXhDb2xvcjsKCnZvaWQgbWFpbigpCnsKICAgIGdsX1Bvc2l0aW9uID0gcHJvamVjdGlvbk1hdHJpeCAqIHZlYzQodmVydGV4UG9zaXRpb24sIDEuMCk7CiAgICB0ZXhDb29yZCA9IHRleFBvc2l0aW9uOwogICAgY29sb3IgPSB2ZXJ0ZXhDb2xvcjsKfQoK";
 kha_Shaders.painter_colored_fragData0 = "s198:I3ZlcnNpb24gMTAwCnByZWNpc2lvbiBtZWRpdW1wIGZsb2F0OwpwcmVjaXNpb24gaGlnaHAgaW50OwoKdmFyeWluZyBoaWdocCB2ZWM0IGZyYWdtZW50Q29sb3I7Cgp2b2lkIG1haW4oKQp7CiAgICBnbF9GcmFnRGF0YVswXSA9IGZyYWdtZW50Q29sb3I7Cn0KCg";
 kha_Shaders.painter_colored_fragData1 = "s192:I3ZlcnNpb24gMTAwCnByZWNpc2lvbiBtZWRpdW1wIGZsb2F0OwpwcmVjaXNpb24gbWVkaXVtcCBpbnQ7Cgp2YXJ5aW5nIHZlYzQgZnJhZ21lbnRDb2xvcjsKCnZvaWQgbWFpbigpCnsKICAgIGdsX0ZyYWdEYXRhWzBdID0gZnJhZ21lbnRDb2xvcjsKfQoK";
 kha_Shaders.painter_colored_fragData2 = "s210:I3ZlcnNpb24gMzAwIGVzCnByZWNpc2lvbiBtZWRpdW1wIGZsb2F0OwpwcmVjaXNpb24gbWVkaXVtcCBpbnQ7CgpvdXQgdmVjNCBGcmFnQ29sb3I7CmluIHZlYzQgZnJhZ21lbnRDb2xvcjsKCnZvaWQgbWFpbigpCnsKICAgIEZyYWdDb2xvciA9IGZyYWdtZW50Q29sb3I7Cn0KCg";
+kha_Shaders.painter_colored_vertData0 = "s331:I3ZlcnNpb24gMTAwCgp1bmlmb3JtIG1hdDQgcHJvamVjdGlvbk1hdHJpeDsKCmF0dHJpYnV0ZSB2ZWMzIHZlcnRleFBvc2l0aW9uOwp2YXJ5aW5nIHZlYzQgZnJhZ21lbnRDb2xvcjsKYXR0cmlidXRlIHZlYzQgdmVydGV4Q29sb3I7Cgp2b2lkIG1haW4oKQp7CiAgICBnbF9Qb3NpdGlvbiA9IHByb2plY3Rpb25NYXRyaXggKiB2ZWM0KHZlcnRleFBvc2l0aW9uLCAxLjApOwogICAgZnJhZ21lbnRDb2xvciA9IHZlcnRleENvbG9yOwp9Cgo";
+kha_Shaders.painter_colored_vertData1 = "s374:I3ZlcnNpb24gMTAwCgp1bmlmb3JtIG1lZGl1bXAgbWF0NCBwcm9qZWN0aW9uTWF0cml4OwoKYXR0cmlidXRlIG1lZGl1bXAgdmVjMyB2ZXJ0ZXhQb3NpdGlvbjsKdmFyeWluZyBtZWRpdW1wIHZlYzQgZnJhZ21lbnRDb2xvcjsKYXR0cmlidXRlIG1lZGl1bXAgdmVjNCB2ZXJ0ZXhDb2xvcjsKCnZvaWQgbWFpbigpCnsKICAgIGdsX1Bvc2l0aW9uID0gcHJvamVjdGlvbk1hdHJpeCAqIHZlYzQodmVydGV4UG9zaXRpb24sIDEuMCk7CiAgICBmcmFnbWVudENvbG9yID0gdmVydGV4Q29sb3I7Cn0KCg";
+kha_Shaders.painter_colored_vertData2 = "s354:I3ZlcnNpb24gMzAwIGVzCgp1bmlmb3JtIG1lZGl1bXAgbWF0NCBwcm9qZWN0aW9uTWF0cml4OwoKaW4gbWVkaXVtcCB2ZWMzIHZlcnRleFBvc2l0aW9uOwpvdXQgbWVkaXVtcCB2ZWM0IGZyYWdtZW50Q29sb3I7CmluIG1lZGl1bXAgdmVjNCB2ZXJ0ZXhDb2xvcjsKCnZvaWQgbWFpbigpCnsKICAgIGdsX1Bvc2l0aW9uID0gcHJvamVjdGlvbk1hdHJpeCAqIHZlYzQodmVydGV4UG9zaXRpb24sIDEuMCk7CiAgICBmcmFnbWVudENvbG9yID0gdmVydGV4Q29sb3I7Cn0KCg";
 kha_Shaders.painter_image_fragData0 = "s471:I3ZlcnNpb24gMTAwCnByZWNpc2lvbiBtZWRpdW1wIGZsb2F0OwpwcmVjaXNpb24gaGlnaHAgaW50OwoKdW5pZm9ybSBoaWdocCBzYW1wbGVyMkQgdGV4OwoKdmFyeWluZyBoaWdocCB2ZWMyIHRleENvb3JkOwp2YXJ5aW5nIGhpZ2hwIHZlYzQgY29sb3I7Cgp2b2lkIG1haW4oKQp7CiAgICBoaWdocCB2ZWM0IHRleGNvbG9yID0gdGV4dHVyZTJEKHRleCwgdGV4Q29vcmQpICogY29sb3I7CiAgICBoaWdocCB2ZWMzIF8zMiA9IHRleGNvbG9yLnh5eiAqIGNvbG9yLnc7CiAgICB0ZXhjb2xvciA9IHZlYzQoXzMyLngsIF8zMi55LCBfMzIueiwgdGV4Y29sb3Iudyk7CiAgICBnbF9GcmFnRGF0YVswXSA9IHRleGNvbG9yOwp9Cgo";
 kha_Shaders.painter_image_fragData1 = "s444:I3ZlcnNpb24gMTAwCnByZWNpc2lvbiBtZWRpdW1wIGZsb2F0OwpwcmVjaXNpb24gbWVkaXVtcCBpbnQ7Cgp1bmlmb3JtIG1lZGl1bXAgc2FtcGxlcjJEIHRleDsKCnZhcnlpbmcgdmVjMiB0ZXhDb29yZDsKdmFyeWluZyB2ZWM0IGNvbG9yOwoKdm9pZCBtYWluKCkKewogICAgdmVjNCB0ZXhjb2xvciA9IHRleHR1cmUyRCh0ZXgsIHRleENvb3JkKSAqIGNvbG9yOwogICAgdmVjMyBfMzIgPSB0ZXhjb2xvci54eXogKiBjb2xvci53OwogICAgdGV4Y29sb3IgPSB2ZWM0KF8zMi54LCBfMzIueSwgXzMyLnosIHRleGNvbG9yLncpOwogICAgZ2xfRnJhZ0RhdGFbMF0gPSB0ZXhjb2xvcjsKfQoK";
 kha_Shaders.painter_image_fragData2 = "s452:I3ZlcnNpb24gMzAwIGVzCnByZWNpc2lvbiBtZWRpdW1wIGZsb2F0OwpwcmVjaXNpb24gbWVkaXVtcCBpbnQ7Cgp1bmlmb3JtIG1lZGl1bXAgc2FtcGxlcjJEIHRleDsKCmluIHZlYzIgdGV4Q29vcmQ7CmluIHZlYzQgY29sb3I7Cm91dCB2ZWM0IEZyYWdDb2xvcjsKCnZvaWQgbWFpbigpCnsKICAgIHZlYzQgdGV4Y29sb3IgPSB0ZXh0dXJlKHRleCwgdGV4Q29vcmQpICogY29sb3I7CiAgICB2ZWMzIF8zMiA9IHRleGNvbG9yLnh5eiAqIGNvbG9yLnc7CiAgICB0ZXhjb2xvciA9IHZlYzQoXzMyLngsIF8zMi55LCBfMzIueiwgdGV4Y29sb3Iudyk7CiAgICBGcmFnQ29sb3IgPSB0ZXhjb2xvcjsKfQoK";
+kha_Shaders.painter_image_vertData0 = "s415:I3ZlcnNpb24gMTAwCgp1bmlmb3JtIG1hdDQgcHJvamVjdGlvbk1hdHJpeDsKCmF0dHJpYnV0ZSB2ZWMzIHZlcnRleFBvc2l0aW9uOwp2YXJ5aW5nIHZlYzIgdGV4Q29vcmQ7CmF0dHJpYnV0ZSB2ZWMyIHRleFBvc2l0aW9uOwp2YXJ5aW5nIHZlYzQgY29sb3I7CmF0dHJpYnV0ZSB2ZWM0IHZlcnRleENvbG9yOwoKdm9pZCBtYWluKCkKewogICAgZ2xfUG9zaXRpb24gPSBwcm9qZWN0aW9uTWF0cml4ICogdmVjNCh2ZXJ0ZXhQb3NpdGlvbiwgMS4wKTsKICAgIHRleENvb3JkID0gdGV4UG9zaXRpb247CiAgICBjb2xvciA9IHZlcnRleENvbG9yOwp9Cgo";
+kha_Shaders.painter_image_vertData1 = "s479:I3ZlcnNpb24gMTAwCgp1bmlmb3JtIG1lZGl1bXAgbWF0NCBwcm9qZWN0aW9uTWF0cml4OwoKYXR0cmlidXRlIG1lZGl1bXAgdmVjMyB2ZXJ0ZXhQb3NpdGlvbjsKdmFyeWluZyBtZWRpdW1wIHZlYzIgdGV4Q29vcmQ7CmF0dHJpYnV0ZSBtZWRpdW1wIHZlYzIgdGV4UG9zaXRpb247CnZhcnlpbmcgbWVkaXVtcCB2ZWM0IGNvbG9yOwphdHRyaWJ1dGUgbWVkaXVtcCB2ZWM0IHZlcnRleENvbG9yOwoKdm9pZCBtYWluKCkKewogICAgZ2xfUG9zaXRpb24gPSBwcm9qZWN0aW9uTWF0cml4ICogdmVjNCh2ZXJ0ZXhQb3NpdGlvbiwgMS4wKTsKICAgIHRleENvb3JkID0gdGV4UG9zaXRpb247CiAgICBjb2xvciA9IHZlcnRleENvbG9yOwp9Cgo";
+kha_Shaders.painter_image_vertData2 = "s444:I3ZlcnNpb24gMzAwIGVzCgp1bmlmb3JtIG1lZGl1bXAgbWF0NCBwcm9qZWN0aW9uTWF0cml4OwoKaW4gbWVkaXVtcCB2ZWMzIHZlcnRleFBvc2l0aW9uOwpvdXQgbWVkaXVtcCB2ZWMyIHRleENvb3JkOwppbiBtZWRpdW1wIHZlYzIgdGV4UG9zaXRpb247Cm91dCBtZWRpdW1wIHZlYzQgY29sb3I7CmluIG1lZGl1bXAgdmVjNCB2ZXJ0ZXhDb2xvcjsKCnZvaWQgbWFpbigpCnsKICAgIGdsX1Bvc2l0aW9uID0gcHJvamVjdGlvbk1hdHJpeCAqIHZlYzQodmVydGV4UG9zaXRpb24sIDEuMCk7CiAgICB0ZXhDb29yZCA9IHRleFBvc2l0aW9uOwogICAgY29sb3IgPSB2ZXJ0ZXhDb2xvcjsKfQoK";
 kha_Shaders.painter_text_fragData0 = "s351:I3ZlcnNpb24gMTAwCnByZWNpc2lvbiBtZWRpdW1wIGZsb2F0OwpwcmVjaXNpb24gaGlnaHAgaW50OwoKdW5pZm9ybSBoaWdocCBzYW1wbGVyMkQgdGV4OwoKdmFyeWluZyBoaWdocCB2ZWM0IGZyYWdtZW50Q29sb3I7CnZhcnlpbmcgaGlnaHAgdmVjMiB0ZXhDb29yZDsKCnZvaWQgbWFpbigpCnsKICAgIGdsX0ZyYWdEYXRhWzBdID0gdmVjNChmcmFnbWVudENvbG9yLnh5eiwgdGV4dHVyZTJEKHRleCwgdGV4Q29vcmQpLnggKiBmcmFnbWVudENvbG9yLncpOwp9Cgo";
 kha_Shaders.painter_text_fragData1 = "s340:I3ZlcnNpb24gMTAwCnByZWNpc2lvbiBtZWRpdW1wIGZsb2F0OwpwcmVjaXNpb24gbWVkaXVtcCBpbnQ7Cgp1bmlmb3JtIG1lZGl1bXAgc2FtcGxlcjJEIHRleDsKCnZhcnlpbmcgdmVjNCBmcmFnbWVudENvbG9yOwp2YXJ5aW5nIHZlYzIgdGV4Q29vcmQ7Cgp2b2lkIG1haW4oKQp7CiAgICBnbF9GcmFnRGF0YVswXSA9IHZlYzQoZnJhZ21lbnRDb2xvci54eXosIHRleHR1cmUyRCh0ZXgsIHRleENvb3JkKS54ICogZnJhZ21lbnRDb2xvci53KTsKfQoK";
 kha_Shaders.painter_text_fragData2 = "s348:I3ZlcnNpb24gMzAwIGVzCnByZWNpc2lvbiBtZWRpdW1wIGZsb2F0OwpwcmVjaXNpb24gbWVkaXVtcCBpbnQ7Cgp1bmlmb3JtIG1lZGl1bXAgc2FtcGxlcjJEIHRleDsKCm91dCB2ZWM0IEZyYWdDb2xvcjsKaW4gdmVjNCBmcmFnbWVudENvbG9yOwppbiB2ZWMyIHRleENvb3JkOwoKdm9pZCBtYWluKCkKewogICAgRnJhZ0NvbG9yID0gdmVjNChmcmFnbWVudENvbG9yLnh5eiwgdGV4dHVyZSh0ZXgsIHRleENvb3JkKS54ICogZnJhZ21lbnRDb2xvci53KTsKfQoK";

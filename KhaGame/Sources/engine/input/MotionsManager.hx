@@ -1,5 +1,7 @@
 package engine.input;
 
+import entities.UpdateContext;
+
 class MotionsManager
 {
 	public function new()
@@ -18,25 +20,27 @@ class MotionsManager
 		_motions.add(new MotionInfo(type, id, x, y));
 	} 
 
-	public function update()
+	public function update(e: UpdateContext)
 	{
+		var sx: Int = Std.int(e.Viewport.Width/2);
+		var sy: Int = Std.int(e.Viewport.Height/2);
 		for (m in _motions)
 		{
+			var x: Int = m.X-sx;
+			var y: Int = sy - m.Y;
 			for (h in _handlers)
 			{
-				switch(m.Motion)
+				if (m.Motion == MotionType.Start)
 				{
-					case MotionType.None:
-						break;
-					case MotionType.Start:
-					 	h.motionStart(m.X, m.Y);
-						break;
-					case MotionType.Move:
-					 	h.motionMove(m.X, m.Y);
-						break;
-					case MotionType.End:
-					 	h.motionEnd(m.X, m.Y);
-						break;
+					h.motionStart(x, y);
+				}
+				if (m.Motion == MotionType.Move)
+				{
+					h.motionMove(x, y);
+				}
+				if (m.Motion == MotionType.End)
+				{
+					h.motionEnd(x, y);
 				}
 			}
 		}

@@ -18,9 +18,10 @@ class ComponentText implements IComponent
 		return EntitySystem.SytemRenderId;
 	};
 
-	public function new (layer: Int)
+	public function new (layer: Int, text: String)
 	{
 		Layer = layer;
+		Text = text;
 	}
 
 	public function load(e: LoadContext): Void

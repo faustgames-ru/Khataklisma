@@ -7,6 +7,7 @@ class TileInfo
 	public var RenderX: Float;
 	public var RenderY: Float;
 	public var Value: Int;
+	
 	public function new()
 	{
 		

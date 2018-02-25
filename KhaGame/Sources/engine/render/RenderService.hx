@@ -37,8 +37,8 @@ class RenderService implements IRenderService
 	var _vbCache: Float32Array;
 	var _ibCache: Uint32Array;
 	
-	var _vLimit: Int = 64*1024;
-	var _iLimit: Int = 64*1024;
+	var _vLimit: Int = 256*1024;
+	var _iLimit: Int = 256*1024;
 	var _layersLimit: Int = 10;
 
 	public function new()

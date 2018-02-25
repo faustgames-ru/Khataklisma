@@ -4,6 +4,7 @@ class Statistics
 {
 	public static var Instance: Statistics = new Statistics();
 	public var LastFps: Float = 0;
+	public var BuildingsCount: Int = 0;
 	public var LastRenderDelay: Float = 0;
 	public var LastFpsPerSecond: Float = 0;
 
@@ -23,6 +24,11 @@ class Statistics
 			_framesCount = 0;
 			_perSecondTime = 0;
 		}
+	}
+
+	public function reportBuildingsCount(count: Int): Void
+	{
+		BuildingsCount = count;
 	}
 
 	private function new()
