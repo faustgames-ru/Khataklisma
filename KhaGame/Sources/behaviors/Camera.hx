@@ -6,7 +6,8 @@ import entities.LoadContext;
 import entities.EntitySystem;
 import engine.input.IMotionHandler;
 import engine.input.MotionHandleMode;
-import engine.Ease;
+import engine.MathHelpers;
+import engine.Aabb;
 import kha.math.FastMatrix4;
 import haxe.ds.Vector;
 
@@ -40,9 +41,10 @@ class Camera implements IComponent implements IMotionHandler
 
 	public function update(e: UpdateContext): Void
 	{
-		_cameraX = Ease.lerp(_cameraX, _cameraTargetX, Ease.saturate(e.EllapsetTime*4));
-		_cameraY = Ease.lerp(_cameraY, _cameraTargetY, Ease.saturate(e.EllapsetTime*4));
+		_cameraX = MathHelpers.lerp(_cameraX, _cameraTargetX, MathHelpers.saturate(e.EllapsetTime*4));
+		_cameraY = MathHelpers.lerp(_cameraY, _cameraTargetY, MathHelpers.saturate(e.EllapsetTime*4));
 		updateHistory(_cameraX, _cameraY);
+		e.Frustum = Aabb.fromXYSize(-_cameraX, -_cameraY, 512+128, 384+96); // todo: remove magic nubmers
 		e.Render.setTransform(0, FastMatrix4.translation(_cameraX, _cameraY, 0));
 	}
 	

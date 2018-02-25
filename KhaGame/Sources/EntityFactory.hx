@@ -2,17 +2,29 @@ package;
 
 import engine.Transform;
 import engine.resources.ResourceImage;
+import engine.resources.ResourceAtlas;
+import engine.resources.ResourceTileMap;
 import engine.render.RenderLayer;
+import engine.tilemap.TilesPalette;
 import entities.Entity;
 import components.ComponentTransform;
 import components.ComponentText;
 import components.ComponentSprite;
+import components.ComponentTileMap;
 import behaviors.FpsCounter;
 import behaviors.Camera;
 
 class EntityFactory
 {
-	public static function Sprite(layer: Int, x: Float, y: Float, image: ResourceImage): Entity
+	public static function tilemap(tiles: ResourceTileMap, palette: TilesPalette): Entity
+	{
+		return new Entity(
+			[
+				new ComponentTileMap(RenderLayer.GameLayer0, tiles, palette), 
+			]);
+	}
+
+	public static function sprite(layer: Int, x: Float, y: Float, image: ResourceImage): Entity
 	{
 		return new Entity(
 			[
@@ -21,7 +33,7 @@ class EntityFactory
 			]);
 	}
 
-	public static function Camera(): Entity
+	public static function camera(): Entity
 	{
 		return new Entity(
 			[
@@ -29,7 +41,7 @@ class EntityFactory
 			]);
 	}
 
-	public static function FpsCounter(x: Float, y: Float): Entity
+	public static function fpsCounter(x: Float, y: Float): Entity
 	{
 		return new Entity(
 			[

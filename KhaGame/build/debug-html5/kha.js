@@ -37,13 +37,16 @@ EReg.prototype = {
 var EntityFactory = function() { };
 $hxClasses["EntityFactory"] = EntityFactory;
 EntityFactory.__name__ = ["EntityFactory"];
-EntityFactory.Sprite = function(layer,x,y,image) {
+EntityFactory.tilemap = function(tiles,palette) {
+	return new entities_Entity([new components_ComponentTileMap(engine_render_RenderLayer.GameLayer0,tiles,palette)]);
+};
+EntityFactory.sprite = function(layer,x,y,image) {
 	return new entities_Entity([new components_ComponentTransform(engine_Transform.fromXY(x,y)),new components_ComponentSprite(layer,image)]);
 };
-EntityFactory.Camera = function() {
+EntityFactory.camera = function() {
 	return new entities_Entity([new behaviors_Camera()]);
 };
-EntityFactory.FpsCounter = function(x,y) {
+EntityFactory.fpsCounter = function(x,y) {
 	return new entities_Entity([new components_ComponentTransform(engine_Transform.fromXY(x,y)),new components_ComponentText(engine_render_RenderLayer.GuiLayer),new behaviors_FpsCounter()]);
 };
 var HxOverrides = function() { };
@@ -267,32 +270,13 @@ Project.__name__ = ["Project"];
 Project.prototype = {
 	afterLoadAssets: function() {
 		this._resources.DefaultFont = engine_resources_ResourceFont.fromBlob(kha_Assets.blobs.calibri_fnt,kha_Assets.images.calibri_0);
-		this._resources.ResourceAtlas = engine_resources_ResourceAtlas.fromBlob(kha_Assets.blobs.all_scene_images_json,kha_Assets.images.all_scene_images);
+		this._resources.DefaultAtlas = engine_resources_ResourceAtlas.fromBlob(kha_Assets.blobs.all_scene_images_json,kha_Assets.images.all_scene_images);
+		this._resources.DefaultTiles = engine_resources_ResourceTileMap.fromBlob(kha_Assets.blobs.tiles_json);
 		this._world = new entities_EntityWorld(new entities_LoadContext(this._resources,this._motions));
-		this._world.addEntity(EntityFactory.Camera());
-		var exx = 50;
-		var exy = -25;
-		var eyx = -50;
-		var eyy = -25;
-		var cx = 512;
-		var cy = 384;
-		var _g = 0;
-		while(_g < 2) {
-			var l = _g++;
-			var _g1 = -8;
-			while(_g1 < 9) {
-				var x = _g1++;
-				var _g2 = -8;
-				while(_g2 < 9) {
-					var y = _g2++;
-					var sx = cx + exx * x + eyx * y;
-					var sy = cy + exy * x + eyy * y;
-					var _this = this._resources.ResourceAtlas.Frames;
-					this._world.addEntity(EntityFactory.Sprite(engine_render_RenderLayer.GameLayer0,sx,sy,__map_reserved["buildingTiles_000.png"] != null ? _this.getReserved("buildingTiles_000.png") : _this.h["buildingTiles_000.png"]));
-				}
-			}
-		}
-		this._world.addEntity(EntityFactory.FpsCounter(10,10));
+		this._world.addEntity(EntityFactory.camera());
+		var palette = new engine_tilemap_TilesPalette("landscapeTiles_",".png",this._resources.DefaultAtlas);
+		this._world.addEntity(EntityFactory.tilemap(this._resources.DefaultTiles,palette));
+		this._world.addEntity(EntityFactory.fpsCounter(-502,-370));
 	}
 	,update: function() {
 		this.updateInternal();
@@ -362,6 +346,13 @@ StringBuf.prototype = {
 var StringTools = function() { };
 $hxClasses["StringTools"] = StringTools;
 StringTools.__name__ = ["StringTools"];
+StringTools.startsWith = function(s,start) {
+	if(s.length >= start.length) {
+		return HxOverrides.substr(s,0,start.length) == start;
+	} else {
+		return false;
+	}
+};
 StringTools.endsWith = function(s,end) {
 	var elen = end.length;
 	var slen = s.length;
@@ -646,9 +637,10 @@ behaviors_Camera.prototype = {
 		e.Motions.addHandler(this);
 	}
 	,update: function(e) {
-		this._cameraX = engine_Ease.lerp(this._cameraX,this._cameraTargetX,engine_Ease.saturate(e.EllapsetTime * 4));
-		this._cameraY = engine_Ease.lerp(this._cameraY,this._cameraTargetY,engine_Ease.saturate(e.EllapsetTime * 4));
+		this._cameraX = engine_MathHelpers.lerp(this._cameraX,this._cameraTargetX,engine_MathHelpers.saturate(e.EllapsetTime * 4));
+		this._cameraY = engine_MathHelpers.lerp(this._cameraY,this._cameraTargetY,engine_MathHelpers.saturate(e.EllapsetTime * 4));
 		this.updateHistory(this._cameraX,this._cameraY);
+		e.Frustum = engine_Aabb.fromXYSize(-this._cameraX,-this._cameraY,640,480);
 		e.Render.setTransform(0,new kha_math_FastMatrix4(1,0,0,this._cameraX,0,1,0,this._cameraY,0,0,1,0,0,0,0,1));
 	}
 	,proirity: function() {
@@ -786,6 +778,40 @@ components_ComponentText.prototype = {
 	}
 	,__class__: components_ComponentText
 };
+var components_ComponentTileMap = function(layer,tiles,palette) {
+	this.Layer = 0;
+	this.Layer = layer;
+	var transform = new kha_math_FastMatrix2(64,-64,-32,-32);
+	this.TileMap = new engine_tilemap_TileMap(tiles,transform);
+	var this1 = new Array(16384);
+	this._renderTiles = this1;
+	var _g1 = 0;
+	var _g = this._renderTiles.length;
+	while(_g1 < _g) {
+		var i = _g1++;
+		this._renderTiles[i] = new engine_tilemap_TileInfo();
+	}
+	this.Palette = palette;
+};
+$hxClasses["components.ComponentTileMap"] = components_ComponentTileMap;
+components_ComponentTileMap.__name__ = ["components","ComponentTileMap"];
+components_ComponentTileMap.__interfaces__ = [entities_IComponent];
+components_ComponentTileMap.prototype = {
+	Layer: null
+	,TileMap: null
+	,Palette: null
+	,getSystemId: function() {
+		return entities_EntitySystem.SytemRenderId;
+	}
+	,load: function(e) {
+	}
+	,update: function(e) {
+		var count = this.TileMap.query(e.Frustum,this._renderTiles);
+		this.TileMap.renderTiles(e.Frustum,e.Render,this._renderTiles,count,this.Palette);
+	}
+	,_renderTiles: null
+	,__class__: components_ComponentTileMap
+};
 var components_ComponentTransform = function(value) {
 	this.Value = value;
 };
@@ -803,13 +829,104 @@ components_ComponentTransform.prototype = {
 	}
 	,__class__: components_ComponentTransform
 };
-var engine_Ease = function() { };
-$hxClasses["engine.Ease"] = engine_Ease;
-engine_Ease.__name__ = ["engine","Ease"];
-engine_Ease.lerp = function(from,to,u) {
+var engine_Aabb = function(x,y,sx,sy) {
+	this.X = x;
+	this.Y = y;
+	this.Sx = sx;
+	this.Sy = sy;
+};
+$hxClasses["engine.Aabb"] = engine_Aabb;
+engine_Aabb.__name__ = ["engine","Aabb"];
+engine_Aabb.fromVertices2 = function(vertices) {
+	var minX = engine_MathHelpers.MaxFloat;
+	var minY = engine_MathHelpers.MaxFloat;
+	var maxX = engine_MathHelpers.MinFloat;
+	var maxY = engine_MathHelpers.MinFloat;
+	var _g = 0;
+	while(_g < vertices.length) {
+		var v = vertices[_g];
+		++_g;
+		if(v.x < minX) {
+			minX = v.x;
+		}
+		if(v.y < minY) {
+			minY = v.y;
+		}
+		if(v.x > maxX) {
+			maxX = v.x;
+		}
+		if(v.y > maxY) {
+			maxY = v.y;
+		}
+	}
+	return new engine_Aabb((minX + maxX) * 0.5,(minY + maxY) * 0.5,(maxX - minX) * 0.5,(maxY - minY) * 0.5);
+};
+engine_Aabb.fromXY = function(x,y) {
+	return new engine_Aabb(x,y,1,1);
+};
+engine_Aabb.fromXYSize = function(x,y,sx,sy) {
+	return new engine_Aabb(x,y,sx,sy);
+};
+engine_Aabb.prototype = {
+	X: null
+	,Y: null
+	,Sx: null
+	,Sy: null
+	,include: function(x,y) {
+		var dx = x - this.X;
+		var dy = y - this.Y;
+		if(-this.Sx < dx && -this.Sy < dy && dx < this.Sx) {
+			return dy < this.Sy;
+		} else {
+			return false;
+		}
+	}
+	,minX: function() {
+		return this.X - this.Sx;
+	}
+	,maxX: function() {
+		return this.X + this.Sx;
+	}
+	,minY: function() {
+		return this.Y - this.Sy;
+	}
+	,maxY: function() {
+		return this.Y + this.Sy;
+	}
+	,clone: function() {
+		return new engine_Aabb(this.X,this.Y,this.Sx,this.Sy);
+	}
+	,__class__: engine_Aabb
+};
+var engine_MathHelpers = function() { };
+$hxClasses["engine.MathHelpers"] = engine_MathHelpers;
+engine_MathHelpers.__name__ = ["engine","MathHelpers"];
+engine_MathHelpers.inverseMatrix2 = function(m) {
+	var d = m._00 * m._11 - m._01 * m._10;
+	return new kha_math_FastMatrix2(m._11 / d,-m._10 / d,-m._01 / d,m._00 / d);
+};
+engine_MathHelpers.lerp = function(from,to,u) {
 	return from + (to - from) * u;
 };
-engine_Ease.saturate = function(u) {
+engine_MathHelpers.clamp = function(from,to,u) {
+	if(u < from) {
+		return from;
+	}
+	if(u > to) {
+		return to;
+	}
+	return u;
+};
+engine_MathHelpers.range = function(u,count) {
+	if(u < 0) {
+		return 0;
+	}
+	if(u >= count) {
+		return count;
+	}
+	return u;
+};
+engine_MathHelpers.saturate = function(u) {
 	if(u < 0) {
 		return 0;
 	}
@@ -1112,7 +1229,7 @@ var engine_render_RenderService = function() {
 	this._pipeline.depthMode = kha_graphics4_CompareMode.Always;
 	this._pipeline.cullMode = kha_graphics4_CullMode.None;
 	this._pipeline.blendOperation = kha_graphics4_BlendingOperation.Add;
-	this._pipeline.blendSource = kha_graphics4_BlendingFactor.SourceAlpha;
+	this._pipeline.blendSource = kha_graphics4_BlendingFactor.BlendOne;
 	this._pipeline.blendDestination = kha_graphics4_BlendingFactor.InverseSourceAlpha;
 	this._pipeline.compile();
 	this._transfomID = this._pipeline.getConstantLocation("projection");
@@ -1229,6 +1346,9 @@ engine_render_RenderService.prototype = {
 		g.setVertexBuffer(this._vb);
 		g.setIndexBuffer(this._ib);
 		g.setPipeline(this._pipeline);
+		var w = framebuffer.get_width() * 0.5;
+		var h = framebuffer.get_height() * 0.5;
+		var projection = kha_math_FastMatrix4.orthogonalProjection(-w,w,-h,h,-1,1);
 		var _g3 = 0;
 		var _g12 = this._layers;
 		while(_g3 < _g12.length) {
@@ -1237,9 +1357,8 @@ engine_render_RenderService.prototype = {
 			if(layer.Entries.isEmpty()) {
 				continue;
 			}
-			var _this = kha_math_FastMatrix4.orthogonalProjection(0,framebuffer.get_width(),0,framebuffer.get_height(),-1,1);
 			var m = layer.Transform;
-			var transform = new kha_math_FastMatrix4(_this._00 * m._00 + _this._10 * m._01 + _this._20 * m._02 + _this._30 * m._03,_this._00 * m._10 + _this._10 * m._11 + _this._20 * m._12 + _this._30 * m._13,_this._00 * m._20 + _this._10 * m._21 + _this._20 * m._22 + _this._30 * m._23,_this._00 * m._30 + _this._10 * m._31 + _this._20 * m._32 + _this._30 * m._33,_this._01 * m._00 + _this._11 * m._01 + _this._21 * m._02 + _this._31 * m._03,_this._01 * m._10 + _this._11 * m._11 + _this._21 * m._12 + _this._31 * m._13,_this._01 * m._20 + _this._11 * m._21 + _this._21 * m._22 + _this._31 * m._23,_this._01 * m._30 + _this._11 * m._31 + _this._21 * m._32 + _this._31 * m._33,_this._02 * m._00 + _this._12 * m._01 + _this._22 * m._02 + _this._32 * m._03,_this._02 * m._10 + _this._12 * m._11 + _this._22 * m._12 + _this._32 * m._13,_this._02 * m._20 + _this._12 * m._21 + _this._22 * m._22 + _this._32 * m._23,_this._02 * m._30 + _this._12 * m._31 + _this._22 * m._32 + _this._32 * m._33,_this._03 * m._00 + _this._13 * m._01 + _this._23 * m._02 + _this._33 * m._03,_this._03 * m._10 + _this._13 * m._11 + _this._23 * m._12 + _this._33 * m._13,_this._03 * m._20 + _this._13 * m._21 + _this._23 * m._22 + _this._33 * m._23,_this._03 * m._30 + _this._13 * m._31 + _this._23 * m._32 + _this._33 * m._33);
+			var transform = new kha_math_FastMatrix4(projection._00 * m._00 + projection._10 * m._01 + projection._20 * m._02 + projection._30 * m._03,projection._00 * m._10 + projection._10 * m._11 + projection._20 * m._12 + projection._30 * m._13,projection._00 * m._20 + projection._10 * m._21 + projection._20 * m._22 + projection._30 * m._23,projection._00 * m._30 + projection._10 * m._31 + projection._20 * m._32 + projection._30 * m._33,projection._01 * m._00 + projection._11 * m._01 + projection._21 * m._02 + projection._31 * m._03,projection._01 * m._10 + projection._11 * m._11 + projection._21 * m._12 + projection._31 * m._13,projection._01 * m._20 + projection._11 * m._21 + projection._21 * m._22 + projection._31 * m._23,projection._01 * m._30 + projection._11 * m._31 + projection._21 * m._32 + projection._31 * m._33,projection._02 * m._00 + projection._12 * m._01 + projection._22 * m._02 + projection._32 * m._03,projection._02 * m._10 + projection._12 * m._11 + projection._22 * m._12 + projection._32 * m._13,projection._02 * m._20 + projection._12 * m._21 + projection._22 * m._22 + projection._32 * m._23,projection._02 * m._30 + projection._12 * m._31 + projection._22 * m._32 + projection._32 * m._33,projection._03 * m._00 + projection._13 * m._01 + projection._23 * m._02 + projection._33 * m._03,projection._03 * m._10 + projection._13 * m._11 + projection._23 * m._12 + projection._33 * m._13,projection._03 * m._20 + projection._13 * m._21 + projection._23 * m._22 + projection._33 * m._23,projection._03 * m._30 + projection._13 * m._31 + projection._23 * m._32 + projection._33 * m._33);
 			g.setMatrix(this._transfomID,transform);
 			var _g2_head = layer.Entries.h;
 			while(_g2_head != null) {
@@ -1483,14 +1602,255 @@ engine_resources_ResourceImage.prototype = {
 	}
 	,__class__: engine_resources_ResourceImage
 };
+var engine_resources_ResourceTileMap = function() {
+};
+$hxClasses["engine.resources.ResourceTileMap"] = engine_resources_ResourceTileMap;
+engine_resources_ResourceTileMap.__name__ = ["engine","resources","ResourceTileMap"];
+engine_resources_ResourceTileMap.fromValue = function(sizeX,sizeY,value) {
+	var result = new engine_resources_ResourceTileMap();
+	result.SizeX = sizeX;
+	result.SizeY = sizeY;
+	var this1 = new Array(sizeX * sizeY);
+	result.Map = this1;
+	var _g1 = 0;
+	var _g = result.Map.length;
+	while(_g1 < _g) {
+		var i = _g1++;
+		result.Map[i] = value;
+	}
+	return result;
+};
+engine_resources_ResourceTileMap.fromBlob = function(jsonData) {
+	var jsonTiles = JSON.parse(jsonData.toString());
+	var layer = jsonTiles.layers[0];
+	var result = new engine_resources_ResourceTileMap();
+	result.SizeX = layer.width;
+	result.SizeY = layer.height;
+	var length = layer.data.length;
+	var this1 = new Array(length);
+	result.Map = this1;
+	var _g1 = 0;
+	var _g = result.Map.length;
+	while(_g1 < _g) {
+		var i = _g1++;
+		result.Map[i] = layer.data[i] - 1;
+	}
+	return result;
+};
+engine_resources_ResourceTileMap.prototype = {
+	SizeX: null
+	,SizeY: null
+	,Map: null
+	,get: function(x,y) {
+		var rx = engine_MathHelpers.range(x,this.SizeX);
+		var ry = engine_MathHelpers.range(y,this.SizeY);
+		return this.Map[ry * this.SizeX + rx];
+	}
+	,set: function(x,y,value) {
+		var rx = engine_MathHelpers.range(x,this.SizeX);
+		var ry = engine_MathHelpers.range(y,this.SizeY);
+		this.Map[ry * this.SizeX + rx] = value;
+	}
+	,__class__: engine_resources_ResourceTileMap
+};
+var engine_resources_JsonTilesLayer = function() { };
+$hxClasses["engine.resources.JsonTilesLayer"] = engine_resources_JsonTilesLayer;
+engine_resources_JsonTilesLayer.__name__ = ["engine","resources","JsonTilesLayer"];
+engine_resources_JsonTilesLayer.prototype = {
+	data: null
+	,width: null
+	,height: null
+	,__class__: engine_resources_JsonTilesLayer
+};
+var engine_resources_JsonTilesRoot = function() { };
+$hxClasses["engine.resources.JsonTilesRoot"] = engine_resources_JsonTilesRoot;
+engine_resources_JsonTilesRoot.__name__ = ["engine","resources","JsonTilesRoot"];
+engine_resources_JsonTilesRoot.prototype = {
+	layers: null
+	,__class__: engine_resources_JsonTilesRoot
+};
 var engine_resources_ResourcesManager = function() {
 };
 $hxClasses["engine.resources.ResourcesManager"] = engine_resources_ResourcesManager;
 engine_resources_ResourcesManager.__name__ = ["engine","resources","ResourcesManager"];
 engine_resources_ResourcesManager.prototype = {
 	DefaultFont: null
-	,ResourceAtlas: null
+	,DefaultAtlas: null
+	,DefaultTiles: null
 	,__class__: engine_resources_ResourcesManager
+};
+var engine_tilemap_TileInfo = function() {
+};
+$hxClasses["engine.tilemap.TileInfo"] = engine_tilemap_TileInfo;
+engine_tilemap_TileInfo.__name__ = ["engine","tilemap","TileInfo"];
+engine_tilemap_TileInfo.prototype = {
+	X: null
+	,Y: null
+	,RenderX: null
+	,RenderY: null
+	,Value: null
+	,__class__: engine_tilemap_TileInfo
+};
+var engine_tilemap_TileMap = function(tiles,transform) {
+	this.Tiles = tiles;
+	this.Axis = transform;
+};
+$hxClasses["engine.tilemap.TileMap"] = engine_tilemap_TileMap;
+engine_tilemap_TileMap.__name__ = ["engine","tilemap","TileMap"];
+engine_tilemap_TileMap.prototype = {
+	Tiles: null
+	,Axis: null
+	,query: function(frustum,resultTiles) {
+		var inverse = engine_MathHelpers.inverseMatrix2(this.Axis);
+		var value_y;
+		var value_x = frustum.X - frustum.Sx;
+		value_y = frustum.Y - frustum.Sy;
+		var x = inverse._00 * value_x + inverse._10 * value_y;
+		var y = inverse._01 * value_x + inverse._11 * value_y;
+		var invf = new kha_math_FastVector2(x,y);
+		var value_y1;
+		var value_x1 = frustum.X - frustum.Sx;
+		value_y1 = frustum.Y + frustum.Sy;
+		var x1 = inverse._00 * value_x1 + inverse._10 * value_y1;
+		var y1 = inverse._01 * value_x1 + inverse._11 * value_y1;
+		var invf1 = new kha_math_FastVector2(x1,y1);
+		var value_y2;
+		var value_x2 = frustum.X + frustum.Sx;
+		value_y2 = frustum.Y + frustum.Sy;
+		var x2 = inverse._00 * value_x2 + inverse._10 * value_y2;
+		var y2 = inverse._01 * value_x2 + inverse._11 * value_y2;
+		var invf2 = new kha_math_FastVector2(x2,y2);
+		var value_y3;
+		var value_x3 = frustum.X + frustum.Sx;
+		value_y3 = frustum.Y - frustum.Sy;
+		var x3 = inverse._00 * value_x3 + inverse._10 * value_y3;
+		var y3 = inverse._01 * value_x3 + inverse._11 * value_y3;
+		var invf3 = engine_Aabb.fromVertices2([invf,invf1,invf2,new kha_math_FastVector2(x3,y3)]);
+		var minY = engine_MathHelpers.range(invf3.minY() - 1 | 0,this.Tiles.SizeY);
+		var minX = engine_MathHelpers.range(invf3.minX() - 1 | 0,this.Tiles.SizeX);
+		var maxY = engine_MathHelpers.range(invf3.maxY() + 1 | 0,this.Tiles.SizeY);
+		var maxX = engine_MathHelpers.range(invf3.maxX() + 1 | 0,this.Tiles.SizeX);
+		var p_y;
+		var p_x = 0;
+		p_y = 0;
+		var walker = new engine_tilemap_TilesWalker(frustum,resultTiles,this.Axis,this.Tiles);
+		var posY = minY;
+		while(posY < maxY) {
+			var x4 = minX;
+			var y4 = posY;
+			while(y4 >= minY && x4 <= maxX) {
+				if(!walker.Walk(x4,y4)) {
+					return resultTiles.length;
+				}
+				++x4;
+				--y4;
+			}
+			++posY;
+		}
+		var posX = minX;
+		while(posX <= maxX) {
+			var x5 = posX;
+			var y5 = maxY;
+			while(y5 >= minY && x5 <= maxX) {
+				if(!walker.Walk(x5,y5)) {
+					return resultTiles.length;
+				}
+				++x5;
+				--y5;
+			}
+			++posX;
+		}
+		return walker.Index;
+	}
+	,renderTiles: function(frustum,render,resultTiles,count,palette) {
+		var t = engine_Transform.fromXY(0,0);
+		var _g1 = 0;
+		var _g = count;
+		while(_g1 < _g) {
+			var i = _g1++;
+			var tile = resultTiles[i];
+			t.X = tile.RenderX;
+			t.Y = tile.RenderY;
+			var image = palette.Data[tile.Value];
+			if(image == null) {
+				continue;
+			}
+			image.draw(engine_render_RenderLayer.GameLayer0,render,t);
+		}
+	}
+	,__class__: engine_tilemap_TileMap
+};
+var engine_tilemap_TilesWalker = function(frustum,resultTiles,axis,tiles) {
+	this.p = new kha_math_FastVector2(0,0);
+	this.Index = 0;
+	this.Frustum = frustum;
+	this.ResultTiles = resultTiles;
+	this.Axis = axis;
+	this.Tiles = tiles;
+};
+$hxClasses["engine.tilemap.TilesWalker"] = engine_tilemap_TilesWalker;
+engine_tilemap_TilesWalker.__name__ = ["engine","tilemap","TilesWalker"];
+engine_tilemap_TilesWalker.prototype = {
+	ResultTiles: null
+	,Frustum: null
+	,Index: null
+	,Axis: null
+	,Tiles: null
+	,p: null
+	,Walk: function(x,y) {
+		if(this.Index >= this.ResultTiles.length) {
+			return false;
+		}
+		this.p.x = x;
+		this.p.y = y;
+		var ps_y;
+		var ps_x;
+		var _this = this.Axis;
+		var value = this.p;
+		var x1 = _this._00 * value.x + _this._10 * value.y;
+		var y1 = _this._01 * value.x + _this._11 * value.y;
+		ps_x = x1;
+		ps_y = y1;
+		if(!this.Frustum.include(ps_x,ps_y)) {
+			return true;
+		}
+		var tile = this.ResultTiles[this.Index];
+		tile.X = x;
+		tile.Y = y;
+		tile.RenderX = ps_x;
+		tile.RenderY = ps_y;
+		tile.Value = this.Tiles.get(x,y);
+		this.Index++;
+		return true;
+	}
+	,__class__: engine_tilemap_TilesWalker
+};
+var engine_tilemap_TilesPalette = function(name,ext,atlas) {
+	var data = [];
+	var file = atlas.Frames.keys();
+	while(file.hasNext()) {
+		var file1 = file.next();
+		if(!StringTools.startsWith(file1,name)) {
+			continue;
+		}
+		if(!StringTools.endsWith(file1,ext)) {
+			continue;
+		}
+		var numberString = HxOverrides.substr(file1,name.length,file1.length - name.length - ext.length);
+		var number = Std.parseInt(numberString);
+		if(number == null) {
+			continue;
+		}
+		var _this = atlas.Frames;
+		data[number] = __map_reserved[file1] != null ? _this.getReserved(file1) : _this.h[file1];
+	}
+	this.Data = data.slice(0);
+};
+$hxClasses["engine.tilemap.TilesPalette"] = engine_tilemap_TilesPalette;
+engine_tilemap_TilesPalette.__name__ = ["engine","tilemap","TilesPalette"];
+engine_tilemap_TilesPalette.prototype = {
+	Data: null
+	,__class__: engine_tilemap_TilesPalette
 };
 var entities_Entity = function(components) {
 	this.Components = new List();
@@ -1641,11 +2001,13 @@ var entities_UpdateContext = function(render,motions,ellapsetTime) {
 	this.Motions = motions;
 	this.Render = render;
 	this.EllapsetTime = ellapsetTime;
+	this.Frustum = engine_Aabb.fromXY(0,0);
 };
 $hxClasses["entities.UpdateContext"] = entities_UpdateContext;
 entities_UpdateContext.__name__ = ["entities","UpdateContext"];
 entities_UpdateContext.prototype = {
-	Render: null
+	Frustum: null
+	,Render: null
 	,EllapsetTime: null
 	,Motions: null
 	,__class__: entities_UpdateContext
@@ -2342,6 +2704,9 @@ haxe_ds_StringMap.prototype = {
 			return false;
 		}
 		return this.rh.hasOwnProperty("$" + key);
+	}
+	,keys: function() {
+		return HxOverrides.iter(this.arrayKeys());
 	}
 	,arrayKeys: function() {
 		var out = [];
@@ -3689,7 +4054,10 @@ kha__$Assets_SoundList.prototype = {
 	,__class__: kha__$Assets_SoundList
 };
 var kha__$Assets_BlobList = function() {
-	this.names = ["all_scene_images_json","calibri_fnt"];
+	this.names = ["all_scene_images_json","calibri_fnt","tiles_json"];
+	this.tiles_jsonDescription = { files : ["tiles.json"], type : "blob", name : "tiles_json"};
+	this.tiles_jsonName = "tiles_json";
+	this.tiles_json = null;
 	this.calibri_fntDescription = { files : ["calibri.fnt"], type : "blob", name : "calibri_fnt"};
 	this.calibri_fntName = "calibri_fnt";
 	this.calibri_fnt = null;
@@ -3723,6 +4091,18 @@ kha__$Assets_BlobList.prototype = {
 	,calibri_fntUnload: function() {
 		this.calibri_fnt.unload();
 		this.calibri_fnt = null;
+	}
+	,tiles_json: null
+	,tiles_jsonName: null
+	,tiles_jsonDescription: null
+	,tiles_jsonLoad: function(done) {
+		kha_Assets.loadBlob("tiles_json",function(blob) {
+			done();
+		});
+	}
+	,tiles_jsonUnload: function() {
+		this.tiles_json.unload();
+		this.tiles_json = null;
 	}
 	,names: null
 	,__class__: kha__$Assets_BlobList
@@ -23635,6 +24015,21 @@ kha_js_vr_VrInterface.prototype = $extend(kha_vr_VrInterface.prototype,{
 	}
 	,__class__: kha_js_vr_VrInterface
 });
+var kha_math_FastMatrix2 = function(_00,_10,_01,_11) {
+	this._00 = _00;
+	this._10 = _10;
+	this._01 = _01;
+	this._11 = _11;
+};
+$hxClasses["kha.math.FastMatrix2"] = kha_math_FastMatrix2;
+kha_math_FastMatrix2.__name__ = ["kha","math","FastMatrix2"];
+kha_math_FastMatrix2.prototype = {
+	_00: null
+	,_10: null
+	,_01: null
+	,_11: null
+	,__class__: kha_math_FastMatrix2
+};
 var kha_math_FastMatrix3 = function(_00,_10,_20,_01,_11,_21,_02,_12,_22) {
 	this._00 = _00;
 	this._10 = _10;
@@ -24195,6 +24590,23 @@ kha_math_Vector2.prototype = {
 		return length;
 	}
 	,__class__: kha_math_Vector2
+};
+var kha_math_Vector2i = function(x,y) {
+	if(y == null) {
+		y = 0;
+	}
+	if(x == null) {
+		x = 0;
+	}
+	this.x = x;
+	this.y = y;
+};
+$hxClasses["kha.math.Vector2i"] = kha_math_Vector2i;
+kha_math_Vector2i.__name__ = ["kha","math","Vector2i"];
+kha_math_Vector2i.prototype = {
+	x: null
+	,y: null
+	,__class__: kha_math_Vector2i
 };
 var kha_math_Vector3 = function(x,y,z) {
 	if(z == null) {
@@ -24806,6 +25218,8 @@ Xml.Comment = 3;
 Xml.DocType = 4;
 Xml.ProcessingInstruction = 5;
 Xml.Document = 6;
+engine_MathHelpers.MaxFloat = 1e20;
+engine_MathHelpers.MinFloat = -1e20;
 engine_render_RenderLayer.GameLayer0 = 0;
 engine_render_RenderLayer.GameLayer1 = 1;
 engine_render_RenderLayer.GuiLayer = 2;
@@ -25030,6 +25444,8 @@ kha_internal_HdrFormat.formatPattern = new EReg("FORMAT=32-bit_rle_rgbe","i");
 kha_internal_HdrFormat.widthHeightPattern = new EReg("-Y ([0-9]+) \\+X ([0-9]+)","i");
 kha_js_AEAudioChannel.todo = [];
 kha_js_Sound.loading = [];
+kha_math_FastMatrix2.width = 2;
+kha_math_FastMatrix2.height = 2;
 kha_math_FastMatrix3.width = 3;
 kha_math_FastMatrix3.height = 3;
 kha_math_FastMatrix4.width = 4;

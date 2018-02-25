@@ -8,15 +8,6 @@
 			"type": "blob"
 		},
 		{
-			"name": "all_scene_images",
-			"files": [
-				"all_scene_images.png"
-			],
-			"type": "image",
-			"original_width": 2048,
-			"original_height": 1329
-		},
-		{
 			"name": "calibri_fnt",
 			"files": [
 				"calibri.fnt"
@@ -31,6 +22,50 @@
 			"type": "image",
 			"original_width": 512,
 			"original_height": 512
+		},
+		{
+			"name": "tiles_json",
+			"files": [
+				"tiles.json"
+			],
+			"type": "blob"
+		},
+		{
+			"name": "all_scene_images",
+			"files": [
+				"all_scene_images.png"
+			],
+			"type": "image",
+			"original_width": 2048,
+			"original_height": 1329
+		},
+		{
+			"name": "painter_texture_frag",
+			"files": [
+				"painter-texture.frag.essl",
+				"painter-texture-relaxed.frag.essl",
+				"painter-texture-webgl2.frag.essl"
+			],
+			"type": "shader",
+			"inputs": [
+				{
+					"name": "texCoord",
+					"type": "vec2"
+				}
+			],
+			"outputs": [
+				{
+					"name": "FragColor",
+					"type": "vec4"
+				}
+			],
+			"uniforms": [
+				{
+					"name": "tex",
+					"type": "sampler2D"
+				}
+			],
+			"types": []
 		},
 		{
 			"name": "painter_texture_vert",
@@ -95,34 +130,6 @@
 			]
 		},
 		{
-			"name": "painter_texture_frag",
-			"files": [
-				"painter-texture.frag.essl",
-				"painter-texture-relaxed.frag.essl",
-				"painter-texture-webgl2.frag.essl"
-			],
-			"type": "shader",
-			"inputs": [
-				{
-					"name": "texCoord",
-					"type": "vec2"
-				}
-			],
-			"outputs": [
-				{
-					"name": "FragColor",
-					"type": "vec4"
-				}
-			],
-			"uniforms": [
-				{
-					"name": "tex",
-					"type": "sampler2D"
-				}
-			],
-			"types": []
-		},
-		{
 			"name": "painter_colored_frag",
 			"files": [
 				"painter-colored.frag.essl",
@@ -143,38 +150,6 @@
 				}
 			],
 			"uniforms": [],
-			"types": []
-		},
-		{
-			"name": "painter_image_frag",
-			"files": [
-				"painter-image.frag.essl",
-				"painter-image-relaxed.frag.essl",
-				"painter-image-webgl2.frag.essl"
-			],
-			"type": "shader",
-			"inputs": [
-				{
-					"name": "texCoord",
-					"type": "vec2"
-				},
-				{
-					"name": "color",
-					"type": "vec4"
-				}
-			],
-			"outputs": [
-				{
-					"name": "FragColor",
-					"type": "vec4"
-				}
-			],
-			"uniforms": [
-				{
-					"name": "tex",
-					"type": "sampler2D"
-				}
-			],
 			"types": []
 		},
 		{
@@ -238,6 +213,38 @@
 					]
 				}
 			]
+		},
+		{
+			"name": "painter_image_frag",
+			"files": [
+				"painter-image.frag.essl",
+				"painter-image-relaxed.frag.essl",
+				"painter-image-webgl2.frag.essl"
+			],
+			"type": "shader",
+			"inputs": [
+				{
+					"name": "texCoord",
+					"type": "vec2"
+				},
+				{
+					"name": "color",
+					"type": "vec4"
+				}
+			],
+			"outputs": [
+				{
+					"name": "FragColor",
+					"type": "vec4"
+				}
+			],
+			"uniforms": [
+				{
+					"name": "tex",
+					"type": "sampler2D"
+				}
+			],
+			"types": []
 		},
 		{
 			"name": "painter_text_frag",

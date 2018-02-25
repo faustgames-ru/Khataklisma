@@ -29,7 +29,7 @@ class ResourceAtlas
 					frames[i].triangles);
 			
 			//var subImage = pageTexture.createSubImage(frames[i].frame.x, frames[i].frame.y, frames[i].frame.w, frames[i].frame.h);
-			result.Frames.set(frames[i].filename, subImage);
+			result.Frames.set(frames[i].filename, subImage);			
 		}
 		return result;
 	}

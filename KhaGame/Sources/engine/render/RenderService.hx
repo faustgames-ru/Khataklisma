@@ -62,7 +62,7 @@ class RenderService implements IRenderService
         _pipeline.cullMode = CullMode.None;
 		
 		_pipeline.blendOperation = BlendingOperation.Add;
-		_pipeline.blendSource = BlendingFactor.SourceAlpha;
+		_pipeline.blendSource = BlendingFactor.BlendOne;
 		_pipeline.blendDestination = BlendingFactor.InverseSourceAlpha;
 
 		_pipeline.compile();
@@ -172,11 +172,14 @@ class RenderService implements IRenderService
 		g.setIndexBuffer(_ib);
 		g.setPipeline(_pipeline);
 
+		var w = framebuffer.width*0.5;
+		var h = framebuffer.height*0.5;
+		var projection = FastMatrix4.orthogonalProjection(-w, w, -h, h, -1, 1);
 		for (layer in _layers) 
 		{
 			if (layer.Entries.isEmpty())
 				continue;
-			var transform = FastMatrix4.orthogonalProjection(0, framebuffer.width, 0, framebuffer.height, -1, 1).multmat(layer.Transform);
+			var transform = projection.multmat(layer.Transform);
 			g.setMatrix(_transfomID, transform);
 			for (entry in layer.Entries) 
 			{

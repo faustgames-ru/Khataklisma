@@ -33,6 +33,13 @@
 			"original_height": 512
 		},
 		{
+			"name": "tiles_json",
+			"files": [
+				"tiles.json"
+			],
+			"type": "blob"
+		},
+		{
 			"name": "painter_texture_frag",
 			"files": [
 				"painter-texture.frag.essl",

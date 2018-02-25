@@ -1,17 +1,24 @@
 package;
 
+import haxe.ds.Vector;
 import kha.Framebuffer;
 import kha.Scheduler;
 import kha.System;
 import kha.Assets;
+import kha.math.FastMatrix2;
+import kha.math.Vector2i;
 import utils.Statistics;
 import engine.render.IRenderService;
 import engine.render.RenderService;
-import engine.render.RenderLayer;
 import engine.resources.ResourceFont;
 import engine.resources.ResourceAtlas;
+import engine.resources.ResourceImage;
+import engine.resources.ResourceTileMap;
 import engine.resources.ResourcesManager;
+import engine.Aabb;
 import engine.input.MotionsManager;
+import engine.tilemap.TileMap;
+import engine.tilemap.TilesPalette;
 import entities.EntityWorld;
 import entities.UpdateContext;
 import entities.LoadContext;
@@ -34,32 +41,13 @@ class Project
 	function afterLoadAssets(): Void 
 	{
 		_resources.DefaultFont = ResourceFont.fromBlob(Assets.blobs.calibri_fnt, Assets.images.calibri_0);
-		_resources.ResourceAtlas = ResourceAtlas.fromBlob(Assets.blobs.all_scene_images_json, Assets.images.all_scene_images);
+		_resources.DefaultAtlas = ResourceAtlas.fromBlob(Assets.blobs.all_scene_images_json, Assets.images.all_scene_images);
+		_resources.DefaultTiles = ResourceTileMap.fromBlob(Assets.blobs.tiles_json);
 		_world = new EntityWorld(new LoadContext(_resources, _motions));
-		_world.addEntity(EntityFactory.Camera());
-		var exx:Float = 50;
-		var exy:Float = -25;
-		
-		var eyx:Float = -50;
-		var eyy:Float = -25;
-
-		var cx:Float = 512;
-		var cy:Float = 384;
-
-		for (l in 0...2)
-		{
-			for (x in -8...9)
-			{
-				for (y in -8...9)
-				{
-					var sx = cx + exx*x + eyx*y;
-					var sy = cy + exy*x + eyy*y;
-					_world.addEntity(EntityFactory.Sprite(RenderLayer.GameLayer0, sx, sy, 
-						_resources.ResourceAtlas.Frames.get("buildingTiles_000.png")));
-				}
-			}
-		}
-		_world.addEntity(EntityFactory.FpsCounter(10, 10));
+		_world.addEntity(EntityFactory.camera());
+		var palette = new TilesPalette("landscapeTiles_", ".png",  _resources.DefaultAtlas);
+		_world.addEntity(EntityFactory.tilemap(_resources.DefaultTiles, palette));		
+		_world.addEntity(EntityFactory.fpsCounter(-502, -370));// todo: independent coordinate system?
 	}
 
 	function update(): Void 
@@ -71,12 +59,12 @@ class Project
 	{		
 		if (_world == null) return;
 		_motions.update();
-		_world.update(_updateContext);
+		_world.update(_updateContext);		
 	}
 
 	function render(framebuffer: Framebuffer): Void 
 	{		
-		Statistics.Instance.reportRenderFrame(Scheduler.realTime());
+		Statistics.Instance.reportRenderFrame(Scheduler.realTime());		
 		_render.apply(framebuffer);
 	}
 
