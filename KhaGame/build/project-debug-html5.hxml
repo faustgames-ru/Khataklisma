@@ -1,6 +1,6 @@
--cp C:\_faust\tools\KodeStudio-win32\resources\app\extensions\kha\Kha\Sources
--cp C:\_faust\tools\KodeStudio-win32\resources\app\extensions\kha\Kha\Backends\HTML5
--cp c:\_faust\sources\Khataklisma\KhaGame\Sources
+-cp C:\sources\KodeStudio-win32\resources\app\extensions\kha\Kha\Sources
+-cp C:\sources\KodeStudio-win32\resources\app\extensions\kha\Kha\Backends\HTML5
+-cp c:\sources\Khataklisma\KhaGame\Sources
 -D sys_g1
 -D sys_g2
 -D sys_g3

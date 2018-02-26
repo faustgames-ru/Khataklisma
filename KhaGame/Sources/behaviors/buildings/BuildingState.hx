@@ -11,6 +11,16 @@ class BuildingState
 	{
 	}
 
+
+	public function removeStage(): Bool
+	{
+		if (StagesCount == 0)
+		{
+			return false;
+		}
+		StagesCount--;
+		return true;
+	}
 	public function encode(): Int
 	{
 		return StagesCount + (Health << 4) + (Size << 8) + (BuildingType << 16);

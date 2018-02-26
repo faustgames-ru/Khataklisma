@@ -15,9 +15,9 @@
     <output url="file://$MODULE_DIR$/../html5" />
     <exclude-output />
     <content url="file://$MODULE_DIR$/../..">
-      <sourceFolder url="file://C:\_faust\tools\KodeStudio-win32\resources\app\extensions\kha\Kha\Sources" isTestSource="false" />
-      <sourceFolder url="file://C:\_faust\tools\KodeStudio-win32\resources\app\extensions\kha\Kha\Backends\HTML5" isTestSource="false" />
-      <sourceFolder url="file://c:\_faust\sources\Khataklisma\KhaGame\Sources" isTestSource="false" />
+      <sourceFolder url="file://C:\sources\KodeStudio-win32\resources\app\extensions\kha\Kha\Sources" isTestSource="false" />
+      <sourceFolder url="file://C:\sources\KodeStudio-win32\resources\app\extensions\kha\Kha\Backends\HTML5" isTestSource="false" />
+      <sourceFolder url="file://c:\sources\Khataklisma\KhaGame\Sources" isTestSource="false" />
 
     </content>
     

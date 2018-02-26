@@ -6,26 +6,22 @@ import haxe.ds.Vector;
 
 class ResourceTileMap
 {
-	public var Data: TileStruct;
+	public var Data: TileStruct<Int>;
 
 	public static function fromBlob(jsonData: Blob): ResourceTileMap
 	{
-		var jsonTiles: JsonTilesRoot = haxe.Json.parse(jsonData.toString());
-		var layer = jsonTiles.layers[0];
-		var result = new ResourceTileMap();
-		result.Data.SizeX = layer.width;
-		result.Data.SizeY = layer.height;
-		result.Data.Map = new Vector<Int>(layer.data.length);
-		for (i in 0...result.Data.Map.length)		
-		{
-			result.Data.Map[i] = layer.data[i] - 1;
-		}
-		return result;
+		return new ResourceTileMap(jsonData);
 	}
 
-	private function new()
+	private function new(jsonData: Blob)
 	{
-		Data = new TileStruct();
+		var jsonTiles: JsonTilesRoot = haxe.Json.parse(jsonData.toString());
+		var layer = jsonTiles.layers[0];
+		Data = new TileStruct<Int>(layer.width, layer.height, 0);
+		for (i in 0...Data.Map.length)		
+		{
+			Data.Map[i] = layer.data[i] - 1;
+		}
 	}
 }
 

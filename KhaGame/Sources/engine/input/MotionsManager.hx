@@ -24,103 +24,55 @@ class MotionsManager
 	{
 		var sx: Int = Std.int(e.Viewport.Width/2);
 		var sy: Int = Std.int(e.Viewport.Height/2);
+		
 		for (m in _motions)
 		{
 			var x: Int = m.X-sx;
 			var y: Int = sy - m.Y;
-			for (h in _handlers)
+			var handler = _handled.get(m.Id);
+			if (handler != null)
 			{
-				if (m.Motion == MotionType.Start)
+				invokeHandlers(x, y, m, handler);
+			}
+			else
+			{
+				sortHandlers();
+				for (h in _handlers)
 				{
-					h.motionStart(x, y);
-				}
-				if (m.Motion == MotionType.Move)
-				{
-					h.motionMove(x, y);
-				}
-				if (m.Motion == MotionType.End)
-				{
-					h.motionEnd(x, y);
+					invokeHandlers(x, y, m, h);
+					handler = _handled.get(m.Id);
+					if (handler != null)
+					{
+						break;
+					}
 				}
 			}
 		}
 		_motions.clear();		
 	}
 
-	function _update()
+	private function invokeHandlers(x: Int, y: Int, m: MotionInfo, h: IMotionHandler)
 	{
-		for (m in _motions)
+		if (m.Motion == MotionType.Start)
 		{
-			_replaceList.clear();
-			var handlers = getHandlers(m.Id);
-			if (m.Motion == MotionType.Start)
+			if (h.motionStart(x, y) == MotionHandleMode.Handled)
 			{
-				sortHandlers();
-				for (h in _handlers)
-				{
-					var mode = h.motionStart(m.X, m.Y);
-					if (mode == MotionHandleMode.None)
-						continue;
-					if (processHandler(mode, h)) 
-						break;
-				}
-			}
-			else if (m.Motion == MotionType.Move)
-			{
-				if (handlers.isEmpty())
-				{
-					sortHandlers();
-					for (h in _handlers)
-					{
-						var mode = h.motionMove(m.X, m.Y);
-						if (processHandler(mode, h)) 
-							break;
-					}
-				}
-				else
-				{
-					for (h in handlers)
-					{
-						var mode = h.motionMove(m.X, m.Y);
-						if (processHandler(mode, h)) 
-							break;
-					}
-				}
-			}
-			else if (m.Motion == MotionType.End)
-			{
-				for (h in handlers)
-				{
-					h.motionEnd(m.X, m.Y);
-				}
-			}
-			handlers.clear();
-			for(h in _replaceList)
-			{
-				handlers.add(h);
+				_handled.set(m.Id, h);
 			}
 		}
-		_motions.clear();
-	}
-
-
-	private function processHandler(mode: MotionHandleMode, h: IMotionHandler): Bool
-	{
-		switch(mode)
+		if (m.Motion == MotionType.Move)
 		{
-			case MotionHandleMode.None:
-				return false;
-			case MotionHandleMode.Handled:
-				_replaceList.clear();
-				_replaceList.add(h);
-				return true;
-			case MotionHandleMode.Joint:
-				_replaceList.add(h);
-				return false;
+			if (h.motionMove(x, y) == MotionHandleMode.Handled)
+			{
+				_handled.set(m.Id, h);
+			}
 		}
-		return false;
+		if (m.Motion == MotionType.End)
+		{
+			_handled.set(m.Id, null);
+			h.motionEnd(x, y);
+		}
 	}
-
 	private function sortHandlers()
 	{
 		_handlers.sort(function (a, b): Int
@@ -131,17 +83,6 @@ class MotionsManager
 				return 1;
 			return 0;
 		});
-	}
-
-	private function getHandlers(id: Int): List<IMotionHandler>
-	{
-		var result = _handlersById.get(id);
-		if(result == null)
-		{
-			result = new List<IMotionHandler>();
-			_handlersById.set(id, result);
-		}
-		return result;
 	}
 	
 	private function addHandlers(handlers: List<IMotionHandler>, handler: IMotionHandler): Void
@@ -159,8 +100,7 @@ class MotionsManager
 		handlers.add(handler);
 	}
 
+	var	_handled: Map<Int, IMotionHandler> = new Map<Int, IMotionHandler>();
 	var _motions: List<MotionInfo> = new List<MotionInfo>();
-	var _handlersById: Map<Int, List<IMotionHandler>> = new Map<Int, List<IMotionHandler>>();
 	var _handlers: Array<IMotionHandler> = new Array<IMotionHandler>();
-	var _replaceList: List<IMotionHandler> = new List<IMotionHandler>();
 }

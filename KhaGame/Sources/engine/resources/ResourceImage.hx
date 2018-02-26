@@ -1,6 +1,7 @@
 package engine.resources;
 
 import kha.Image;
+import kha.math.FastVector2;
 import engine.render.IRenderService;
 import engine.Aabb;
 import haxe.ds.Vector;
@@ -11,14 +12,13 @@ class ResourceImage
 	public var Vertices: Vector<Float>;
 	public var Indices: Vector<Int>;
 	public var Texture: Image;
-
-	public function hitTest(x: Int, y: Int, transform: Transform): Bool
-	{
-		var sx: Float = Texture.width*transform.ScaleX / 2;
-		var sy: Float = Texture.height*transform.ScaleX / 2;
-		var tx = (x-transform.X);
-		var ty = (y-transform.Y);
-		return -sx <= tx && tx <= sx && -sy <= ty && ty <= sy;
+	public var Bounds: Aabb;
+	
+	public function hitTest(x: Int, y: Int, t: Transform): Bool
+	{		
+		var tx = (x-t.X);
+		var ty = (y-t.Y);
+		return Bounds.includeScaled(tx, ty, t.ScaleX, t.ScaleY);
 	}
 
 	public function createSubImage(x: Int, y: Int, w: Int, h: Int): ResourceImage
@@ -31,6 +31,7 @@ class ResourceImage
 		var ty0: Float = y / (Texture.height);
 		var tx1: Float = (x+w) / (Texture.width);
 		var ty1: Float = (y+h) / (Texture.height);
+		result.Bounds = Aabb.fromXYSize(0, 0, sx, sy);
 		result.Vertices = Vector.fromArrayCopy(
 		[
 			-sx, -sy, tx0, ty1,
@@ -46,16 +47,21 @@ class ResourceImage
 	{
 		var result = new ResourceImage();
 		result.Texture = Texture;
-
 		result.Vertices = new Vector<Float>(xy.length*4);
-
+		var testVertices = new Array<FastVector2>();
+		var xx:Float = 0;
+		var yy:Float = 0;
 		for (i in 0...xy.length)
 		{
-			result.Vertices[i*4 + 0] = xy[i][0] - x;
-			result.Vertices[i*4 + 1] = y - xy[i][1];
+			xx = xy[i][0] - x;
+			yy =  y - xy[i][1];
+			testVertices[i] = new FastVector2(xx, yy);
+			result.Vertices[i*4 + 0] = xx;
+			result.Vertices[i*4 + 1] =yy;
 			result.Vertices[i*4 + 2] = uv[i][0]/(Texture.width - 1);
 			result.Vertices[i*4 + 3] = uv[i][1]/(Texture.height - 1);
 		}
+		result.Bounds = Aabb.fromVertices2(testVertices);
 
 		result.Indices = new Vector<Int>(inds.length*3);
 		for (i in 0...inds.length)
@@ -74,6 +80,8 @@ class ResourceImage
 		result.Texture = texture;
 		var sx: Float = texture.width / 2;
 		var sy: Float = texture.height / 2;
+		result.Bounds = Aabb.fromXYSize(0, 0, sx, sy);
+
 		result.Vertices = Vector.fromArrayCopy(
 		[
 			-sx, -sy, 0, 1,

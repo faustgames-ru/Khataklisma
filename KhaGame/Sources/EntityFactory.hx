@@ -26,12 +26,12 @@ import haxe.ds.Vector;
 
 class EntityFactory
 {
-	public static function tilemap(tiles: TileStruct, palette: TilesPalette, buildings: Vector<BuildingResource>): Entity
+	public static function tilemap(tiles: TileStruct<Int>, palette: TilesPalette, buildings: Vector<BuildingResource>): Entity
 	{
 		var transform = new FastMatrix2(64, -64, -32, -32);
 		var tilesMap = new TileMap(tiles, transform, palette);
 		var tilesRender = new TileInfos(16*1024);
-		var buildingsStates = TileStruct.fromValue(tiles.SizeX, tiles.SizeY, 0);
+		var buildingsStates = new TileStruct<BuildingInstance>(tiles.SizeX, tiles.SizeY, null);
 		var buildingsInstances = new Array<BuildingInstance>();
 		return new Entity(
 			[

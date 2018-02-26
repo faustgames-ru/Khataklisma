@@ -16,6 +16,7 @@ class AddButton implements IComponent implements IMotionHandler
 	public var Sprite: ComponentSprite;
 	public var Buildings: Buildings;
 	public var Count: Int;
+	public var OriginScale: Float;
 
 	public function new (buildings: Buildings, count: Int)
 	{		
@@ -33,6 +34,7 @@ class AddButton implements IComponent implements IMotionHandler
 		e.Motions.addHandler(this);
 		Transform = e.Owner.get(ComponentTransform);
 		Sprite = e.Owner.get(ComponentSprite);
+		OriginScale = Transform.Value.ScaleX ;
 	}
 
 	public function update(e: UpdateContext): Void
@@ -49,6 +51,31 @@ class AddButton implements IComponent implements IMotionHandler
 	{
 		// do hit test
 		if (Sprite.Image.hitTest(x, y, Transform.Value))
+		{			
+			Transform.Value.ScaleX = Transform.Value.ScaleY = OriginScale*1.2;
+			return MotionHandleMode.Handled;
+		}
+		Transform.Value.ScaleX = Transform.Value.ScaleY = OriginScale*1.0;
+		return MotionHandleMode.None;
+
+	}
+	
+	public function motionMove(x: Int, y: Int): MotionHandleMode
+	{
+		if (Sprite.Image.hitTest(x, y, Transform.Value))
+		{			
+			Transform.Value.ScaleX = Transform.Value.ScaleY = OriginScale*1.2;
+		}
+		else
+		{
+			Transform.Value.ScaleX = Transform.Value.ScaleY = OriginScale*1.0;
+		}
+		return MotionHandleMode.None;
+	}
+
+	public function motionEnd(x: Int, y: Int): Void
+	{
+		if (Sprite.Image.hitTest(x, y, Transform.Value))
 		{
 			if (Count > 0)
 			{
@@ -58,19 +85,8 @@ class AddButton implements IComponent implements IMotionHandler
 			{
 				Buildings.removeBuildings(-Count);
 			}
-			return MotionHandleMode.Handled;
 		}
-		return MotionHandleMode.None;
-
-	}
-	
-	public function motionMove(x: Int, y: Int): MotionHandleMode
-	{
-		return MotionHandleMode.Joint;
-	}
-	public function motionEnd(x: Int, y: Int): Void
-	{
-		// apply action
+		Transform.Value.ScaleX = Transform.Value.ScaleY = OriginScale*1.0;
 	}
 
 }

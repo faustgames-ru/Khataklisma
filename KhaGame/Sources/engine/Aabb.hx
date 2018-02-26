@@ -1,6 +1,7 @@
 package engine;
 
 import kha.math.FastVector2;
+import haxe.ds.Vector;
 
 class Aabb
 {
@@ -15,6 +16,15 @@ class Aabb
 		var dx = x - X;
 		var dy = y - Y;
 		return -Sx < dx && -Sy < dy && dx < Sx && dy < Sy;
+	}
+	
+	public function includeScaled(x: Float, y: Float, sx: Float, sy: Float): Bool
+	{
+		var dx = x - X;
+		var dy = y - Y;
+		var ssx = Sx*sx;
+		var ssy = Sy*sy;
+		return -ssx < dx && -ssy < dy && dx < ssx && dy < ssy;
 	}
 
 	public function minX(): Float

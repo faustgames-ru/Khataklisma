@@ -18,7 +18,7 @@ class BuildingGen
 		var bImg = _atlas.Frames.get(basis);
 		var sImg = _atlas.Frames.get(stage);
 		var rImg = _atlas.Frames.get(roof);
-		return new BuildingResource(bImg, sImg, rImg, 48, 36, xDir, yDir);
+		return new BuildingResource(bImg, sImg, rImg, 64, 36, xDir, yDir);
 
 	}
 	

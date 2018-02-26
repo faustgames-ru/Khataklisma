@@ -16,7 +16,7 @@ import engine.Aabb;
 
 class Buildings implements IComponent implements IMotionHandler
 {	
-	public function new(tiles: TileMap, states: TileStruct, renderData: TileInfos, buildings: Vector<BuildingResource>, buildingsInstances: Array<BuildingInstance>)
+	public function new(tiles: TileMap, states: TileStruct<BuildingInstance>, renderData: TileInfos, buildings: Vector<BuildingResource>, buildingsInstances: Array<BuildingInstance>)
 	{
 		_tiles = tiles;
 		_renderData = renderData;
@@ -31,16 +31,15 @@ class Buildings implements IComponent implements IMotionHandler
 	{
 		var building = _buildings[type];
 		var tiles = building.getTiles(x, y, size);
-		if (!_tileStates.validateTiles(tiles, 0)) 
+		if (!_tileStates.validateTiles(tiles, null)) 
 			return null;
 		_state.BuildingType = type;
 		_state.StagesCount = Std.random(4);
 		_state.Health = _state.StagesCount + Std.random(3);
 		_state.Size = size;
 		var instance = new BuildingInstance(x, y, _state);
-		var id = _buildingsInstances.length;
-		_buildingsInstances[id] = instance;
-		_tileStates.setTiles(tiles, id+1);
+		_buildingsInstances[_buildingsInstances.length] = instance;
+		_tileStates.setTiles(tiles, instance);
 		Statistics.Instance.reportBuildingsCount(_buildingsInstances.length);
 		return instance;
 	}
@@ -50,7 +49,7 @@ class Buildings implements IComponent implements IMotionHandler
 		_state.decode(instance.State);
 		var building = _buildings[_state.BuildingType];
 		var tiles = building.getTiles(instance.getX(), instance.getY(), _state.Size);
-		_tileStates.setTiles(tiles, 0);
+		_tileStates.setTiles(tiles, null);
 		_buildingsInstances.remove(instance);
 		Statistics.Instance.reportBuildingsCount(_buildingsInstances.length);
 	}
@@ -96,39 +95,17 @@ class Buildings implements IComponent implements IMotionHandler
 	
 	public function update(e: UpdateContext): Void
 	{
-		//_frustum = e.Frustum;
+		_frustum = e.Frustum;
 		_tiles.query(e.Frustum, _renderData);
 	}
 
 	public function proirity(): Int
 	{
-		return 0;
+		return 50;
 	}
 	
 	public function motionStart(x: Int, y: Int): MotionHandleMode
-	{
-		if (_frustum == null) return MotionHandleMode.None;
-		var t = Transform.fromXY(0, 0);
-		var removeList= new List<BuildingInstance>();
-		for (i in 0..._renderData.Count)
-		{
-			var d = _renderData.Data[i];
-			var state = _tileStates.get(d.X, d.Y);
-			if (state == 0) continue;
-			var buildingInstnce = _buildingsInstances[state-1];
-			_state.decode(buildingInstnce.State);
-			t.X = d.RenderX - _frustum.X;
-			t.Y = d.RenderY - _frustum.Y;
-			var type = _state.BuildingType;
-			if (_buildings[type].hitTest(x, y, t))
-			{
-				removeList.add(buildingInstnce);
-			}
-		}
-		for (i in removeList)
-		{
-			removeBuilding(i);
-		}
+	{		
 		return MotionHandleMode.None;
 	}
 	
@@ -138,14 +115,45 @@ class Buildings implements IComponent implements IMotionHandler
 	}
 	public function motionEnd(x: Int, y: Int): Void
 	{
-		// apply action
+		if (_frustum == null) return;
+		var t = Transform.fromXY(0, 0);
+		var hitList= new List<BuildingInstance>();
+		for (i in 0..._renderData.Count)
+		{
+			var d = _renderData.Data[i];
+			var instance = _tileStates.get(d.X, d.Y);
+			if (instance == null) continue;
+			_state.decode(instance.State);
+			t.X = d.RenderX - _frustum.X;
+			t.Y = d.RenderY - _frustum.Y;
+			var type = _state.BuildingType;
+			if (_buildings[type].hitTest(x, y, t, _state))
+			{
+				hitList.add(instance);
+			}
+
+		}
+		var last = hitList.last();
+		if (last != null)
+		{
+			_state.decode(last.State);
+			if (!_state.removeStage())
+			{
+				removeBuilding(last);
+			}
+			else
+			{
+				last.State = _state.encode();
+			}
+
+		}
 	}
 
 	var _frustum: Aabb;
 	var _state: BuildingState;
 	var _tiles: TileMap;
 	var _renderData: TileInfos;
-	var _tileStates: TileStruct;
+	var _tileStates: TileStruct<BuildingInstance>;
 	var _gen: BuildingGen;
 	var _buildings: Vector<BuildingResource>;
 	var _buildingsInstances: Array<BuildingInstance>;

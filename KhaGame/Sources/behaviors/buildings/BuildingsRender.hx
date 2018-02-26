@@ -13,7 +13,7 @@ class BuildingsRender implements IComponent
 {	
 	public var Layer: Int = 0;
 
-	public function new(layer: Int, states: TileStruct, renderData: TileInfos, buildings: Vector<BuildingResource>, buildingsInstances: Array<BuildingInstance>)
+	public function new(layer: Int, states: TileStruct<BuildingInstance>, renderData: TileInfos, buildings: Vector<BuildingResource>, buildingsInstances: Array<BuildingInstance>)
 	{
 		Layer = layer;
 		_renderData = renderData;
@@ -39,9 +39,8 @@ class BuildingsRender implements IComponent
 		for (i in 0..._renderData.Count)
 		{
 			var d = _renderData.Data[i];
-			var state = _tileStates.get(d.X, d.Y);
-			if (state == 0) continue;
-			var buildingInstnce = _buildingsInstances[state-1];
+			var buildingInstnce =  _tileStates.get(d.X, d.Y);
+			if (buildingInstnce == null) continue;
 			_buildingState.decode(buildingInstnce.State);
 			t.X = d.RenderX;
 			t.Y = d.RenderY;
@@ -51,7 +50,7 @@ class BuildingsRender implements IComponent
 	}
 
 	var _renderData: TileInfos;
-	var _tileStates: TileStruct;
+	var _tileStates: TileStruct<BuildingInstance>;
 	var _buildingsInstances: Array<BuildingInstance>;
 	var _buildings: Vector<BuildingResource>;
 	var _buildingState: BuildingState;

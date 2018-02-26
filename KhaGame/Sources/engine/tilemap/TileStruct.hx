@@ -4,26 +4,13 @@ import engine.MathHelpers;
 import haxe.ds.Vector;
 import kha.math.Vector2i;
 
-class TileStruct
+class TileStruct<T>
 {
 	public var SizeX: Int;
 	public var SizeY: Int;
-	public var Map: Vector<Int>;
+	public var Map: Vector<T>;
 	
-	public static function fromValue(sizeX: Int, sizeY: Int, value: Int): TileStruct
-	{
-		var result = new TileStruct();
-		result.SizeX = sizeX;
-		result.SizeY = sizeY;
-		result.Map = new Vector<Int>(sizeX*sizeY);
-		for (i in 0...result.Map.length)		
-		{
-			result.Map[i] = value;
-		}
-		return result;
-	}
-
-	public function validateTiles(tiles: Array<Vector2i>, value: Int): Bool
+	public function validateTiles(tiles: Array<Vector2i>, value: T): Bool
 	{
 		for (v in tiles)
 		{
@@ -36,7 +23,7 @@ class TileStruct
 		return true;
 	}
 
-	public function setTiles(tiles: Array<Vector2i>, value: Int): Void
+	public function setTiles(tiles: Array<Vector2i>, value: T): Void
 	{
 		for (v in tiles)
 		{
@@ -50,18 +37,24 @@ class TileStruct
 		return ry*SizeX + rx;
 	}
 
-	public function get(x: Int, y: Int): Int
+	public function get(x: Int, y: Int): T
 	{
 		return Map[getAddress(x, y)];
 	}
 
-	public function set(x: Int, y: Int, value: Int): Void
+	public function set(x: Int, y: Int, value: T): Void
 	{
 		Map[getAddress(x, y)] = value;
 	}
 
-	public function new()
+	public function new(sizeX: Int, sizeY: Int, value: T)
 	{
-
+		SizeX = sizeX;
+		SizeY = sizeY;
+		Map = new Vector<T>(sizeX*sizeY);
+		for (i in 0...Map.length)		
+		{
+			Map[i] = value;
+		}
 	}
 }

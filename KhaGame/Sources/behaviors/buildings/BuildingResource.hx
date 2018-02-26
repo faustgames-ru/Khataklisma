@@ -46,20 +46,23 @@ class BuildingResource
 		];
 	}
 
-	public function hitTest(x: Int, y: Int, t: Transform): Bool
+	public function hitTest(x: Int, y: Int, t: Transform, state: BuildingState): Bool
 	{		
 		if (Base.hitTest(x, y, t))
 			return true;
 		t.Y += BaseH;
-		var count = 2;
+		var count = state.StagesCount;
 		for (i in 0...count)
 		{
 			if (Stage.hitTest(x, y, t))
 				return true;
 			t.Y += StageH;
 		}
-		if (Roof.hitTest(x, y, t))
-			return true;
+		if (count != 0)
+		{
+			if (Roof.hitTest(x, y, t))
+				return true;
+		}
 		return false;
 	}
 
@@ -67,13 +70,16 @@ class BuildingResource
 	{
 		Base.draw(layer, render, t);
 		t.Y += BaseH;
-		var count = 2;
+		var count = state.StagesCount;
 		for (i in 0...count)
 		{
 			Stage.draw(layer, render, t);
 			t.Y += StageH;
 		}
-		Roof.draw(layer, render, t);
+		if (count != 0)
+		{
+			Roof.draw(layer, render, t);
+		}
 	}
 }
 

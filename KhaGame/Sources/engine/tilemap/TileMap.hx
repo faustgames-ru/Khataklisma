@@ -13,35 +13,40 @@ import kha.math.Vector2i;
 
 class TileMap
 {
-	public var Tiles: TileStruct;
+	public var Tiles: TileStruct<Int>;
 	public var Axis: FastMatrix2;
 	public var Palette: TilesPalette;
-
-	public function new(tiles: TileStruct, transform: FastMatrix2, palette: TilesPalette)
+	public var OwnFrustum: Aabb;
+	public function new(tiles: TileStruct<Int>, transform: FastMatrix2, palette: TilesPalette)
 	{
 		Tiles = tiles;
 		Axis = transform;
 		Palette = palette;
+		OwnFrustum = Aabb.fromXY(0, 0);
 	}
 
 	public function query(frustum: Aabb, resultTiles: TileInfos): Void
 	{
 		resultTiles.clear();
+		OwnFrustum.X = frustum.X;
+		OwnFrustum.Y = frustum.Y - 128; // crutch
+		OwnFrustum.Sx = frustum.Sx;
+		OwnFrustum.Sy = frustum.Sy;
 
 		var inverse: FastMatrix2 = MathHelpers.inverseMatrix2(Axis);
 
 		var invf = Aabb.fromVertices2([
-			inverse.multvec(new FastVector2(frustum.X-frustum.Sx, frustum.Y-frustum.Sy)),
-			inverse.multvec(new FastVector2(frustum.X-frustum.Sx, frustum.Y+frustum.Sy)),
-			inverse.multvec(new FastVector2(frustum.X+frustum.Sx, frustum.Y+frustum.Sy)),
-			inverse.multvec(new FastVector2(frustum.X+frustum.Sx, frustum.Y-frustum.Sy)),
+			inverse.multvec(new FastVector2(OwnFrustum.X-OwnFrustum.Sx, OwnFrustum.Y-OwnFrustum.Sy)),
+			inverse.multvec(new FastVector2(OwnFrustum.X-OwnFrustum.Sx, OwnFrustum.Y+OwnFrustum.Sy)),
+			inverse.multvec(new FastVector2(OwnFrustum.X+OwnFrustum.Sx, OwnFrustum.Y+OwnFrustum.Sy)),
+			inverse.multvec(new FastVector2(OwnFrustum.X+OwnFrustum.Sx, OwnFrustum.Y-OwnFrustum.Sy)),
 		]);		
 		var minY = MathHelpers.range(Std.int(invf.minY()-1), Tiles.SizeY);
 		var minX = MathHelpers.range(Std.int(invf.minX()-1), Tiles.SizeX);
-		var maxY = MathHelpers.range(Std.int(invf.maxY()+1), Tiles.SizeY);
+		var maxY = MathHelpers.range(Std.int(invf.maxY()+1), Tiles.SizeY); // crutch
 		var maxX = MathHelpers.range(Std.int(invf.maxX()+1), Tiles.SizeX);
 		var p = new FastVector2(0, 0);
-		var walker = new TilesWalker(frustum, resultTiles, Axis, Tiles);
+		var walker = new TilesWalker(OwnFrustum, resultTiles, Axis, Tiles);
 		
 		var posY = minY;
 		while (posY < maxY)
@@ -95,10 +100,10 @@ class TilesWalker
 	public var Frustum: Aabb;
 	public var Index: Int = 0;
 	public var Axis: FastMatrix2;
-	public var Tiles: TileStruct;
+	public var Tiles: TileStruct<Int>;
 	public var p: FastVector2 = new FastVector2(0, 0);
 
-	public function new(frustum: Aabb, resultTiles: TileInfos, axis: FastMatrix2, tiles: TileStruct)
+	public function new(frustum: Aabb, resultTiles: TileInfos, axis: FastMatrix2, tiles: TileStruct<Int>)
 	{
 		Frustum = frustum;
 		ResultTiles = resultTiles;
